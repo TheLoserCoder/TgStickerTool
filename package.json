@@ -22,7 +22,8 @@
     "appId": "com.tgstickertool.app",
     "productName": "TgStickerTool",
     "files": [
-      "dist/**/*"
+      "dist/**/*",
+      "package.json"
     ],
     "directories": {
       "output": "release"

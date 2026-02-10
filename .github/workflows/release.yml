@@ -31,11 +31,11 @@ jobs:
       
       - name: Build Windows
         if: matrix.os == 'windows-latest'
-        run: npx electron-builder --win --x64
+        run: npm run dist -- --win
       
       - name: Build Linux
         if: matrix.os == 'ubuntu-latest'
-        run: npx electron-builder --linux --AppImage
+        run: npm run dist -- --linux
       
       - name: Upload Windows artifacts
         if: matrix.os == 'windows-latest'
