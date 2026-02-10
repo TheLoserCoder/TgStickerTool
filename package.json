@@ -1,7 +1,7 @@
 {
   "name": "tgstickertool",
   "version": "1.0.0",
-  "description": "Telegram Sticker Tool built with Electron",
+  "description": "Telegram Sticker Tool",
   "main": "dist/main/main.js",
   "scripts": {
     "dev:vite": "vite",
@@ -21,14 +21,24 @@
   "build": {
     "appId": "com.tgstickertool.app",
     "productName": "TgStickerTool",
+    "npmRebuild": true,
     "files": [
       "dist/**/*",
       "public/**/*",
-      "package.json"
+      "package.json",
+      "node_modules/sharp/**/*",
+      "node_modules/@ffmpeg-installer/**/*"
     ],
     "directories": {
       "output": "release"
     },
+    "extraResources": [
+      {
+        "from": "node_modules/@ffmpeg-installer/ffmpeg/bin",
+        "to": "ffmpeg-bin",
+        "filter": ["**/*"]
+      }
+    ],
     "win": {
       "target": "nsis",
       "icon": "build/icon_windows.ico"
