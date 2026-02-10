@@ -33,7 +33,11 @@
       "**/node_modules/detect-libc/**/*",
       "**/node_modules/semver/**/*",
       "**/node_modules/@ffmpeg-installer/**/*",
-      "**/node_modules/fluent-ffmpeg/**/*"
+      "**/node_modules/fluent-ffmpeg/**/*",
+      "**/node_modules/electron-store/**/*",
+      "**/node_modules/grammy/**/*",
+      "**/node_modules/axios/**/*",
+      "**/node_modules/uniqueid/**/*"
     ],
     "files": [
       "dist/**/*",
@@ -45,7 +49,11 @@
       "node_modules/detect-libc/**/*",
       "node_modules/semver/**/*",
       "node_modules/@ffmpeg-installer/**/*",
-      "node_modules/fluent-ffmpeg/**/*"
+      "node_modules/fluent-ffmpeg/**/*",
+      "node_modules/electron-store/**/*",
+      "node_modules/grammy/**/*",
+      "node_modules/axios/**/*",
+      "node_modules/uniqueid/**/*"
     ],
     "directories": {
       "output": "release"
@@ -75,7 +83,11 @@
         "**/node_modules/@img/**/*",
         "**/node_modules/detect-libc/**/*",
         "**/node_modules/semver/**/*",
-        "**/node_modules/fluent-ffmpeg/**/*"
+        "**/node_modules/fluent-ffmpeg/**/*",
+        "**/node_modules/electron-store/**/*",
+        "**/node_modules/grammy/**/*",
+        "**/node_modules/axios/**/*",
+        "**/node_modules/uniqueid/**/*"
       ]
     },
     "nsis": {
