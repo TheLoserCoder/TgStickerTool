@@ -11,7 +11,8 @@
     "build:main": "vite build --config vite.main.config.ts",
     "build:preload": "vite build --config vite.preload.config.ts",
     "build": "npm run build:main && npm run build:preload && npm run build:renderer",
-    "make": "npm run build && electron-builder"
+    "make": "npm run build && electron-builder",
+    "dist": "electron-builder"
   },
   "keywords": [],
   "author": "",
@@ -26,9 +27,19 @@
     "directories": {
       "output": "release"
     },
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon_windows.ico"
+    },
     "linux": {
       "target": "AppImage",
+      "icon": "build/icon_linux.png",
       "category": "Utility"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
     }
   },
   "devDependencies": {
