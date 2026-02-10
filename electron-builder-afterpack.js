@@ -5,7 +5,8 @@ exports.default = async function(context) {
   const appOutDir = context.appOutDir;
   const platform = context.electronPlatformName;
   
-  const modulesToCopy = ['sharp', '@img', 'detect-libc', 'semver', 'fluent-ffmpeg', '@ffmpeg-installer', 'electron-store', 'grammy', 'axios', 'uniqueid'];
+  // Копируем только нативные модули, остальное уже в ASAR
+  const modulesToCopy = ['sharp', '@img', '@ffmpeg-installer'];
   
   if (platform === 'linux' || platform === 'win32') {
     const resourcesDir = path.join(appOutDir, 'resources');

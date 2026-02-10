@@ -30,30 +30,13 @@
     "asarUnpack": [
       "**/node_modules/sharp/**/*",
       "**/node_modules/@img/**/*",
-      "**/node_modules/detect-libc/**/*",
-      "**/node_modules/semver/**/*",
-      "**/node_modules/@ffmpeg-installer/**/*",
-      "**/node_modules/fluent-ffmpeg/**/*",
-      "**/node_modules/electron-store/**/*",
-      "**/node_modules/grammy/**/*",
-      "**/node_modules/axios/**/*",
-      "**/node_modules/uniqueid/**/*"
+      "**/node_modules/@ffmpeg-installer/**/*"
     ],
     "files": [
       "dist/**/*",
       "public/**/*",
       "package.json",
-      "!node_modules",
-      "node_modules/sharp/**/*",
-      "node_modules/@img/**/*",
-      "node_modules/detect-libc/**/*",
-      "node_modules/semver/**/*",
-      "node_modules/@ffmpeg-installer/**/*",
-      "node_modules/fluent-ffmpeg/**/*",
-      "node_modules/electron-store/**/*",
-      "node_modules/grammy/**/*",
-      "node_modules/axios/**/*",
-      "node_modules/uniqueid/**/*"
+      "node_modules/**/*"
     ],
     "directories": {
       "output": "release"
@@ -81,13 +64,7 @@
       "asarUnpack": [
         "**/node_modules/sharp/**/*",
         "**/node_modules/@img/**/*",
-        "**/node_modules/detect-libc/**/*",
-        "**/node_modules/semver/**/*",
-        "**/node_modules/fluent-ffmpeg/**/*",
-        "**/node_modules/electron-store/**/*",
-        "**/node_modules/grammy/**/*",
-        "**/node_modules/axios/**/*",
-        "**/node_modules/uniqueid/**/*"
+        "**/node_modules/@ffmpeg-installer/**/*"
       ]
     },
     "nsis": {
