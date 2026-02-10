@@ -1,5 +1,5 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { OutputFormat, UpscaleMode, ImageSettings } from '../../../common/types';
+import { OutputFormat, UpscaleMode, DownscaleMode, ImageSettings } from '../../../common/types';
 
 interface ImageItem {
   id: string;
@@ -14,6 +14,7 @@ interface ImageState {
   zoom: number;
   outputFormat: OutputFormat;
   upscaleMode: UpscaleMode;
+  downscaleMode: DownscaleMode;
   globalSettings: ImageSettings;
   isProcessing: boolean;
   progress: {
@@ -32,6 +33,7 @@ const initialState: ImageState = {
   zoom: 1,
   outputFormat: 'STICKER',
   upscaleMode: 'soft',
+  downscaleMode: 'highQuality',
   globalSettings: { rows: 1, columns: 1 },
   isProcessing: false,
   progress: {
@@ -49,11 +51,9 @@ const imageSlice = createSlice({
   initialState,
   reducers: {
     addImages: (state, action: PayloadAction<ImageItem[]>) => {
-      const existingPaths = new Set(state.images.map(img => img.path));
-      const newImages = action.payload.filter(img => !existingPaths.has(img.path));
-      state.images = [...state.images, ...newImages];
-      if (state.images.length === newImages.length) {
-        state.activeImageId = newImages.length > 1 ? 'all' : newImages[0]?.id || 'all';
+      state.images = [...state.images, ...action.payload];
+      if (state.images.length === action.payload.length) {
+        state.activeImageId = action.payload.length > 1 ? 'all' : action.payload[0]?.id || 'all';
       }
     },
     removeImage: (state, action: PayloadAction<string>) => {
@@ -98,6 +98,9 @@ const imageSlice = createSlice({
     setUpscaleMode: (state, action: PayloadAction<UpscaleMode>) => {
       state.upscaleMode = action.payload;
     },
+    setDownscaleMode: (state, action: PayloadAction<DownscaleMode>) => {
+      state.downscaleMode = action.payload;
+    },
     setProcessing: (state, action: PayloadAction<boolean>) => {
       state.isProcessing = action.payload;
     },
@@ -120,6 +123,7 @@ export const {
   resetZoom,
   setOutputFormat,
   setUpscaleMode,
+  setDownscaleMode,
   setProcessing,
   setProgress,
   resetImage,

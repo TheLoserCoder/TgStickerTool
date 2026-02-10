@@ -10,6 +10,11 @@ import { SortableItem } from './SortableGrid';
 import type { LocalPack, TelegramUploadProgress } from '../../../../common/types';
 import styles from './PackViewPage.module.scss';
 
+import { addImages } from '../image/imageSlice';
+
+let imageIdCounter = 0;
+const generateImageId = () => `img_${Date.now()}_${imageIdCounter++}`;
+
 export function PackViewPage() {
   const dispatch = useAppDispatch();
   const { currentPackId } = useAppSelector((state) => state.app);
@@ -141,17 +146,21 @@ export function PackViewPage() {
   const handleAddMore = async () => {
     const filePaths = await window.electron.selectFiles();
     if (filePaths && filePaths.length > 0 && pack) {
+      await window.electron.store.set('editingPackId', pack.id);
+      
       const newImages = await Promise.all(
         filePaths.map(async (filePath) => {
           const base64Data = await window.electron.readImageAsBase64(filePath);
-          return { path: filePath, data: base64Data };
+          return {
+            id: generateImageId(),
+            path: filePath,
+            data: base64Data,
+            settings: { rows: 1, columns: 1 },
+          };
         })
       );
       
-      await window.electron.store.set('editingPackId', pack.id);
-      await window.electron.store.set('editingPackImages', newImages);
-      await window.electron.store.set('shouldReloadPack', true);
-      
+      dispatch(addImages(newImages));
       dispatch(navigateTo('EDITOR'));
     }
   };

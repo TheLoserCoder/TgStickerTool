@@ -41,11 +41,14 @@ parentPort?.on('message', async (task: WorkerTask) => {
 
       parentPort?.postMessage({ stage: 'sliced', row, col });
 
+      const videoSize = targetSize === 100 ? 100 : 512;
+      
       await new Promise<void>((resolve, reject) => {
         ffmpeg(tempGifPath)
           .outputOptions([
             '-c:v libvpx-vp9',
             '-pix_fmt yuva420p',
+            `-s ${videoSize}x${videoSize}`,
             '-b:v 0',
             '-crf 15',
             '-quality best',
@@ -70,7 +73,8 @@ parentPort?.on('message', async (task: WorkerTask) => {
           width: targetSize,
           height: targetSize,
         })
-        .webp({ quality: 100, effort: 6, smartSubsample: false })
+        .ensureAlpha()
+        .webp({ quality: 100, effort: 6, smartSubsample: false, alphaQuality: 100 })
         .toFile(outputWebpPath);
 
       parentPort?.postMessage({ stage: 'sliced', row, col });

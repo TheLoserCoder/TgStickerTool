@@ -143,28 +143,77 @@ export class TelegramBotClient implements IStickerProvider {
         console.log('[TelegramBot] Creating new sticker set...');
         
         if (stickerType === 'custom_emoji') {
-          const allStickerParams = stickers.map(sticker => {
-            const buffer = fs.readFileSync(sticker.filePath);
-            const isWebm = sticker.filePath.endsWith('.webm');
-            return {
-              sticker: new InputFile(buffer, isWebm ? 'sticker.webm' : 'sticker.webp'),
-              emoji_list: [sticker.emoji],
-              format: isWebm ? 'video' : stickerFormat,
-            };
-          });
+          console.log('[TelegramBot] Creating custom emoji set with', stickers.length, 'stickers');
           
-          await this.bot.api.createNewStickerSet(
-            userId,
-            finalName,
-            title,
-            allStickerParams,
-            { sticker_type: 'custom_emoji' }
-          );
-          
-          console.log('[TelegramBot] Custom emoji set created');
-          if (onProgress) {
-            for (let i = 1; i <= stickers.length; i++) {
-              onProgress(i, stickers.length);
+          try {
+            // Пытаемся создать пак со всеми стикерами сразу
+            const allStickerParams = stickers.map(sticker => {
+              const buffer = fs.readFileSync(sticker.filePath);
+              const isWebm = sticker.filePath.endsWith('.webm');
+              return {
+                sticker: new InputFile(buffer, isWebm ? 'sticker.webm' : 'sticker.webp'),
+                emoji_list: [sticker.emoji],
+                format: isWebm ? 'video' : stickerFormat,
+              };
+            });
+            
+            await this.bot.api.createNewStickerSet(
+              userId,
+              finalName,
+              title,
+              allStickerParams,
+              { sticker_type: 'custom_emoji' }
+            );
+            
+            console.log('[TelegramBot] Custom emoji set created with all stickers at once');
+            if (onProgress) {
+              for (let i = 1; i <= stickers.length; i++) {
+                onProgress(i, stickers.length);
+              }
+            }
+          } catch (error: any) {
+            // Если получили ошибку 413, создаем пак по одному стикеру
+            if (error.error_code === 413 || error.message?.includes('413') || error.message?.includes('Request Entity Too Large')) {
+              console.log('[TelegramBot] Bulk upload failed (413), falling back to one-by-one upload');
+              
+              const firstStickerBuffer = fs.readFileSync(firstSticker.filePath);
+              const isWebm = firstSticker.filePath.endsWith('.webm');
+              const actualFormat = isWebm ? 'video' : stickerFormat;
+              
+              await this.bot.api.createNewStickerSet(
+                userId,
+                finalName,
+                title,
+                [
+                  {
+                    sticker: new InputFile(firstStickerBuffer, isWebm ? 'sticker.webm' : 'sticker.webp'),
+                    emoji_list: [firstSticker.emoji],
+                    format: actualFormat,
+                  },
+                ],
+                { sticker_type: 'custom_emoji' }
+              );
+              
+              console.log('[TelegramBot] Custom emoji set created with first sticker');
+              onProgress?.(1, stickers.length);
+              
+              for (let i = 1; i < stickers.length; i++) {
+                console.log(`[TelegramBot] Adding custom emoji ${i + 1}/${stickers.length}`);
+                const result = await this.addSticker(userId, finalName, stickers[i], stickerFormat);
+                
+                if (!result.success) {
+                  return {
+                    success: false,
+                    error: `Ошибка при загрузке эмодзи ${i + 1}/${stickers.length}`,
+                    errorCode: 'UPLOAD_FAILED',
+                  };
+                }
+                
+                onProgress?.(i + 1, stickers.length);
+                await this.delay(stickers[i].filePath.endsWith('.webm') ? 800 : 400);
+              }
+            } else {
+              throw error;
             }
           }
         } else {
@@ -327,7 +376,7 @@ export class TelegramBotClient implements IStickerProvider {
     }
   }
 
-  async reorderStickers(packName: string, desiredOrder: string[]): Promise<{ success: boolean; moved: number }> {
+  async reorderStickers(packName: string, desiredOrder: string[], onProgress?: (current: number, total: number) => void): Promise<{ success: boolean; moved: number }> {
     try {
       const stickerSet = await this.getStickerSet(packName);
       if (!stickerSet) {
@@ -336,6 +385,7 @@ export class TelegramBotClient implements IStickerProvider {
 
       const currentOrder = stickerSet.stickers.map((s: any) => s.file_id);
       let moved = 0;
+      const toMove = desiredOrder.filter((fileId, i) => currentOrder.indexOf(fileId) !== i && currentOrder.indexOf(fileId) !== -1);
 
       for (let i = 0; i < desiredOrder.length; i++) {
         const fileId = desiredOrder[i];
@@ -345,6 +395,7 @@ export class TelegramBotClient implements IStickerProvider {
           const success = await this.setStickerPositionInSet(fileId, i);
           if (success) {
             moved++;
+            onProgress?.(moved, toMove.length);
             currentOrder.splice(currentPos, 1);
             currentOrder.splice(i, 0, fileId);
             await this.delay(500);

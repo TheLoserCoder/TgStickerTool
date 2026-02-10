@@ -13,6 +13,18 @@ import { SyncResult } from './services/IStickerProvider';
 import Store from 'electron-store';
 const store = new Store();
 
+protocol.registerSchemesAsPrivileged([
+  { 
+    scheme: 'gif-file', 
+    privileges: { 
+      standard: true, 
+      secure: true, 
+      supportFetchAPI: true, 
+      bypassCSP: true
+    } 
+  }
+]);
+
 let mainWindow: BrowserWindow | null = null;
 let botClient: TelegramBotClient | null = null;
 
@@ -20,6 +32,7 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
+    autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -81,7 +94,13 @@ ipcMain.handle(IPC_CHANNELS.SAVE_PACK, async (_, packId: string, packDir: string
     fs.writeFileSync(metaPath, JSON.stringify(packData, null, 2));
     
     const fragmentsDir = path.join(packDir, 'fragments');
-    const files = fs.readdirSync(fragmentsDir).filter(f => f.endsWith('.webp') || f.endsWith('.webm'));
+    const files = fs.readdirSync(fragmentsDir)
+      .filter(f => f.endsWith('.webp') || f.endsWith('.webm'))
+      .sort((a, b) => {
+        const aNum = parseInt(a.match(/frag_(\d+)/)?.[1] || '0');
+        const bNum = parseInt(b.match(/frag_(\d+)/)?.[1] || '0');
+        return aNum - bNum;
+      });
     
     if (files.length > 0) {
       const firstFragment = path.join(fragmentsDir, files[0]);
@@ -95,6 +114,7 @@ ipcMain.handle(IPC_CHANNELS.SAVE_PACK, async (_, packId: string, packDir: string
     
     const manifestService = new ManifestService(packDir);
     manifestService.initFragments(files, '😀');
+    console.log('[Main] Created manifest for local pack with', files.length, 'fragments');
   } catch (error) {
     console.error('Error saving pack:', error);
   }
@@ -216,7 +236,11 @@ ipcMain.handle(IPC_CHANNELS.GET_GIFS, async () => {
     
     const files = fs.readdirSync(gifsDir)
       .filter(f => f.toLowerCase().endsWith('.gif'))
-      .map(f => path.join(gifsDir, f));
+      .map(f => {
+        const filePath = path.join(gifsDir, f);
+        const buffer = fs.readFileSync(filePath);
+        return `data:image/gif;base64,${buffer.toString('base64')}`;
+      });
     
     return files;
   } catch (error) {
@@ -339,7 +363,7 @@ ipcMain.handle(IPC_CHANNELS.UPDATE_MANIFEST, async (_, packDir: string) => {
   }
 });
 
-ipcMain.handle(IPC_CHANNELS.REORDER_STICKERS, async (_, packDir: string, botToken: string, desiredOrder: string[]) => {
+ipcMain.handle(IPC_CHANNELS.REORDER_STICKERS, async (event, packDir: string, botToken: string, desiredOrder: string[]) => {
   try {
     console.log('[Main] REORDER_STICKERS called');
     console.log('[Main] Desired order:', desiredOrder);
@@ -372,7 +396,16 @@ ipcMain.handle(IPC_CHANNELS.REORDER_STICKERS, async (_, packDir: string, botToke
     }
     
     botClient = new TelegramBotClient(botToken);
-    const result = await botClient.reorderStickers(manifest.packName, fileIds);
+    const result = await botClient.reorderStickers(manifest.packName, fileIds, (current, total) => {
+      const percent = Math.round((current / total) * 100);
+      event.sender.send(IPC_CHANNELS.TELEGRAM_UPLOAD_PROGRESS, {
+        current,
+        total,
+        percent,
+        stage: 'uploading',
+        message: `Синхронизация порядка: ${current} из ${total}`,
+      });
+    });
     
     console.log('[Main] Reorder result from TelegramBot:', result);
     
@@ -393,7 +426,7 @@ ipcMain.handle(IPC_CHANNELS.REORDER_STICKERS, async (_, packDir: string, botToke
 
 ipcMain.handle(IPC_CHANNELS.PROCESS_SLICING, async (event, params: SlicingParams): Promise<SlicingResult> => {
   try {
-    const { images, targetDir, outputFormat, upscaleMode, startIndex = 0 } = params;
+    const { images, targetDir, outputFormat, upscaleMode, downscaleMode, startIndex = 0 } = params;
     
     fs.mkdirSync(targetDir, { recursive: true });
     
@@ -424,9 +457,21 @@ ipcMain.handle(IPC_CHANNELS.PROCESS_SLICING, async (event, params: SlicingParams
       event.sender.send(IPC_CHANNELS.SLICING_PROGRESS, progress);
     };
 
-    // Апскейлинг всех изображений
+    // Обработка всех изображений
     for (const img of images) {
-      const sharpInstance = sharp(img.path, { animated: true });
+      let processPath = img.path;
+      const isJpeg = /\.(jpe?g)$/i.test(img.path);
+      
+      if (isJpeg) {
+        const tempPngPath = path.join(tempDir, `${path.basename(img.path, path.extname(img.path))}.png`);
+        await sharp(img.path)
+          .flatten({ background: { r: 0, g: 0, b: 0, alpha: 0 } })
+          .png()
+          .toFile(tempPngPath);
+        processPath = tempPngPath;
+      }
+      
+      const sharpInstance = sharp(processPath, { animated: true });
       const metadata = await sharpInstance.metadata();
       const isAnimated = metadata.pages && metadata.pages > 1;
 
@@ -443,7 +488,7 @@ ipcMain.handle(IPC_CHANNELS.PROCESS_SLICING, async (event, params: SlicingParams
       const extendRight = totalW - W - extendLeft;
       const extendBottom = totalH - H - extendTop;
 
-      const canvas = await sharp(img.path, isAnimated ? { animated: true } : {})
+      const canvas = await sharp(processPath, isAnimated ? { animated: true } : {})
         .extend({
           top: extendTop,
           bottom: extendBottom,
@@ -451,50 +496,104 @@ ipcMain.handle(IPC_CHANNELS.PROCESS_SLICING, async (event, params: SlicingParams
           right: extendRight,
           background: { r: 0, g: 0, b: 0, alpha: 0 },
         })
+        .ensureAlpha()
         .toBuffer();
 
       const finalCanvasSize = targetSize * Math.max(img.rows, img.columns);
-      const scaleFactor = finalCanvasSize / Math.max(totalW, totalH);
+      const sourceSize = Math.max(totalW, totalH);
+      const scaleFactor = finalCanvasSize / sourceSize;
+      const needsUpscale = sourceSize < finalCanvasSize;
+      const needsDownscale = sourceSize > finalCanvasSize;
 
-      let upscaledCanvas: Buffer;
-      if (upscaleMode === 'none') {
-        upscaledCanvas = await sharp(canvas, isAnimated ? { animated: true } : {})
-          .resize(
-            Math.round(totalW * scaleFactor),
-            Math.round(totalH * scaleFactor),
-            { kernel: 'lanczos3', fastShrinkOnLoad: false }
-          )
-          .toBuffer();
-      } else if (upscaleMode === 'sharp') {
-        upscaledCanvas = await sharp(canvas, isAnimated ? { animated: true } : {})
-          .linear(1.1, -0.05)
-          .resize(
-            Math.round(totalW * scaleFactor * 1.1),
-            Math.round(totalH * scaleFactor * 1.1),
-            { kernel: 'mitchell', fastShrinkOnLoad: false }
-          )
-          .sharpen({ sigma: 1.2, m1: 0.2, m2: 20.0 })
-          .resize(
-            Math.round(totalW * scaleFactor),
-            Math.round(totalH * scaleFactor),
-            { kernel: 'mitchell', fastShrinkOnLoad: false }
-          )
-          .modulate({ saturation: 1.15, brightness: 1.02 })
-          .toBuffer();
+      let processedCanvas: Buffer;
+
+      if (needsDownscale) {
+        // Сценарий А: Уменьшение
+        if (downscaleMode === 'highQuality') {
+          const scaleRatio = sourceSize / finalCanvasSize;
+          
+          if (scaleRatio >= 3) {
+            // Ступенчатое уменьшение для больших коэффициентов
+            const intermediateSize = Math.round(finalCanvasSize * 2);
+            processedCanvas = await sharp(canvas, isAnimated ? { animated: true } : {})
+              .resize(intermediateSize, intermediateSize, { kernel: 'lanczos3', fit: 'inside' })
+              .resize(
+                Math.round(totalW * scaleFactor),
+                Math.round(totalH * scaleFactor),
+                { kernel: 'lanczos3', fit: 'inside' }
+              )
+              .sharpen({ sigma: 0.5 })
+              .ensureAlpha()
+              .toBuffer();
+          } else {
+            processedCanvas = await sharp(canvas, isAnimated ? { animated: true } : {})
+              .resize(
+                Math.round(totalW * scaleFactor),
+                Math.round(totalH * scaleFactor),
+                { kernel: 'lanczos3', fit: 'inside' }
+              )
+              .sharpen({ sigma: 0.5 })
+              .ensureAlpha()
+              .toBuffer();
+          }
+        } else {
+          // Быстрое сжатие
+          processedCanvas = await sharp(canvas, isAnimated ? { animated: true } : {})
+            .resize(
+              Math.round(totalW * scaleFactor),
+              Math.round(totalH * scaleFactor),
+              { kernel: 'lanczos3', fastShrinkOnLoad: true }
+            )
+            .ensureAlpha()
+            .toBuffer();
+        }
+      } else if (needsUpscale) {
+        // Сценарий Б: Увеличение - применяем AI-апскейлер
+        if (upscaleMode === 'sharp') {
+          processedCanvas = await sharp(canvas, isAnimated ? { animated: true } : {})
+            .linear(1.1, -0.05)
+            .resize(
+              Math.round(totalW * scaleFactor * 1.1),
+              Math.round(totalH * scaleFactor * 1.1),
+              { kernel: 'mitchell', fastShrinkOnLoad: false }
+            )
+            .sharpen({ sigma: 1.2, m1: 0.2, m2: 20.0 })
+            .resize(
+              Math.round(totalW * scaleFactor),
+              Math.round(totalH * scaleFactor),
+              { kernel: 'mitchell', fastShrinkOnLoad: false }
+            )
+            .modulate({ saturation: 1.15, brightness: 1.02 })
+            .ensureAlpha()
+            .toBuffer();
+        } else if (upscaleMode === 'soft') {
+          processedCanvas = await sharp(canvas, isAnimated ? { animated: true } : {})
+            .sharpen({ sigma: 1.2, m1: 1.5, m2: 0.7 })
+            .resize(
+              Math.round(totalW * scaleFactor),
+              Math.round(totalH * scaleFactor),
+              { kernel: 'lanczos3', fastShrinkOnLoad: false }
+            )
+            .sharpen({ sigma: 0.8, m1: 1.0, m2: 0.5 })
+            .modulate({ saturation: 1.15, brightness: 1.02 })
+            .ensureAlpha()
+            .toBuffer();
+        } else {
+          processedCanvas = await sharp(canvas, isAnimated ? { animated: true } : {})
+            .resize(
+              Math.round(totalW * scaleFactor),
+              Math.round(totalH * scaleFactor),
+              { kernel: 'lanczos3', fastShrinkOnLoad: false }
+            )
+            .ensureAlpha()
+            .toBuffer();
+        }
       } else {
-        upscaledCanvas = await sharp(canvas, isAnimated ? { animated: true } : {})
-          .sharpen({ sigma: 1.2, m1: 1.5, m2: 0.7 })
-          .resize(
-            Math.round(totalW * scaleFactor),
-            Math.round(totalH * scaleFactor),
-            { kernel: 'lanczos3', fastShrinkOnLoad: false }
-          )
-          .sharpen({ sigma: 0.8, m1: 1.0, m2: 0.5 })
-          .modulate({ saturation: 1.15, brightness: 1.02 })
-          .toBuffer();
+        // Сценарий В: Размеры совпадают
+        processedCanvas = canvas;
       }
 
-      imageData.push({ id: img.id, path: img.path, rows: img.rows, columns: img.columns, canvas: upscaledCanvas, isAnimated });
+      imageData.push({ id: img.id, path: img.path, rows: img.rows, columns: img.columns, canvas: processedCanvas, isAnimated });
       upscaled++;
       sendProgress('upscaling');
     }
@@ -696,7 +795,10 @@ ipcMain.handle(IPC_CHANNELS.CREATE_TELEGRAM_PACK, async (event, params: Telegram
       }
     }
     
-    const pendingFragments = manifest.fragments.filter(f => f.status === 'pending');
+    const pendingFragments = manifest.fragments.filter(f => {
+      const filePath = path.join(fragmentsDir, f.fileName);
+      return f.status === 'pending' && fs.existsSync(filePath);
+    });
     const uploadedCount = manifest.fragments.filter(f => f.status === 'uploaded').length;
 
     if (pendingFragments.length === 0 && uploadedCount > 0) {
@@ -774,12 +876,6 @@ ipcMain.handle(IPC_CHANNELS.CREATE_TELEGRAM_PACK, async (event, params: Telegram
         await store.set('localPacks', updatedPacks);
       }
     }
-    
-    event.sender.send(IPC_CHANNELS.TELEGRAM_UPLOAD_COMPLETE, {
-      success: result.success,
-      packLink: result.packLink,
-      error: result.error,
-    });
 
     return result;
   } catch (error) {
@@ -795,6 +891,17 @@ app.whenReady().then(() => {
     const url = request.url.replace('local-file://', '');
     const filePath = path.join(app.getPath('userData'), url);
     callback({ path: filePath });
+  });
+  
+  protocol.registerFileProtocol('gif-file', (request, callback) => {
+    const filePath = decodeURI(request.url.replace('gif-file://', ''));
+    console.log('[Main] Loading gif:', filePath);
+    if (fs.existsSync(filePath)) {
+      callback({ path: filePath });
+    } else {
+      console.error('[Main] Gif file not found:', filePath);
+      callback({ error: -6 });
+    }
   });
   
   createWindow();

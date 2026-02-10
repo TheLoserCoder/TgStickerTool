@@ -37,6 +37,7 @@ export interface Preset {
   rows: number;
   columns: number;
   upscaleMode: UpscaleMode;
+  downscaleMode: DownscaleMode;
   outputFormat: OutputFormat;
 }
 
@@ -54,6 +55,7 @@ export interface LocalPack {
     columns: number;
     outputFormat: OutputFormat;
     upscaleMode: UpscaleMode;
+    downscaleMode: DownscaleMode;
   };
   status: 'local' | 'telegram';
   isAnimated: boolean;
@@ -79,6 +81,7 @@ export interface FragmentManifest {
 
 export type OutputFormat = 'STICKER' | 'EMOJI';
 export type UpscaleMode = 'soft' | 'sharp' | 'none';
+export type DownscaleMode = 'none' | 'highQuality';
 
 export interface ImageSettings {
   rows: number;
@@ -95,6 +98,7 @@ export interface SlicingParams {
   targetDir: string;
   outputFormat: OutputFormat;
   upscaleMode: UpscaleMode;
+  downscaleMode: DownscaleMode;
   startIndex?: number;
 }
 

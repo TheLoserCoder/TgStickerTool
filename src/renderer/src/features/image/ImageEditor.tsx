@@ -1,6 +1,6 @@
 import { useAppDispatch, useAppSelector } from '../../app/hooks';
 import { navigateTo } from '../../app/appSlice';
-import { addImages, removeImage, setActiveImage, updateImageSettings, updateGlobalSettings, increaseZoom, decreaseZoom, resetZoom, setOutputFormat, setUpscaleMode, setProcessing, setProgress, resetImage } from './imageSlice';
+import { addImages, removeImage, setActiveImage, updateImageSettings, updateGlobalSettings, increaseZoom, decreaseZoom, resetZoom, setOutputFormat, setUpscaleMode, setDownscaleMode, setProcessing, setProgress, resetImage } from './imageSlice';
 import { ImageIcon, DownloadIcon, UploadIcon } from '@radix-ui/react-icons';
 import { Button, IconButton } from '../../shared/components/ui';
 import { ImageCanvas } from './ImageCanvas';
@@ -9,23 +9,28 @@ import { SaveLocallyDialog } from '../../shared/components/ui/SaveLocallyDialog'
 import styles from './ImageEditor.module.scss';
 import { useEffect, useState } from 'react';
 import uniqueid from 'uniqueid';
-import type { OutputFormat, UpscaleMode, LocalPack } from '../../../../common/types';
+import type { OutputFormat, UpscaleMode, DownscaleMode, LocalPack } from '../../../../common/types';
 
-const generateId = uniqueid('img_');
-const generatePackId = uniqueid('pack_');
+let imageIdCounter = 0;
+const generateImageId = () => `img_${Date.now()}_${imageIdCounter++}`;
+const generatePackId = () => `pack_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
 export function ImageEditor() {
   const dispatch = useAppDispatch();
-  const { images, activeImageId, zoom, outputFormat, upscaleMode, globalSettings, isProcessing, progress } = useAppSelector((state) => state.image);
+  const { images, activeImageId, zoom, outputFormat, upscaleMode, downscaleMode, globalSettings, isProcessing, progress } = useAppSelector((state) => state.image);
   const { presets } = useAppSelector((state) => state.app);
   const [telegramDialogOpen, setTelegramDialogOpen] = useState(false);
   const [localDialogOpen, setLocalDialogOpen] = useState(false);
   const [editingPack, setEditingPack] = useState<LocalPack | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const loadEditingContext = async () => {
       const packId = await window.electron.store.get('editingPackId');
-      const savedImages = await window.electron.store.get('editingPackImages');
+      
+      await window.electron.store.set('editingPackId', null);
+      
+      console.log('[ImageEditor] Loading context:', { packId });
       
       if (packId) {
         const localPacks = await window.electron.store.get('localPacks') || [];
@@ -34,20 +39,11 @@ export function ImageEditor() {
           setEditingPack(pack);
           dispatch(setOutputFormat(pack.settings.outputFormat));
           dispatch(setUpscaleMode(pack.settings.upscaleMode));
+          dispatch(setDownscaleMode(pack.settings.downscaleMode));
         }
-        await window.electron.store.set('editingPackId', null);
       }
       
-      if (savedImages && savedImages.length > 0) {
-        const newImages = savedImages.map((img: any) => ({
-          id: generateId(),
-          path: img.path,
-          data: img.data,
-          settings: { rows: 1, columns: 1 },
-        }));
-        dispatch(addImages(newImages));
-        await window.electron.store.set('editingPackImages', null);
-      }
+      setIsLoading(false);
     };
     
     loadEditingContext();
@@ -55,7 +51,7 @@ export function ImageEditor() {
     window.electron.onSlicingProgress((data) => {
       dispatch(setProgress(data));
     });
-  }, [dispatch]);
+  }, []);
 
   const handleBack = () => {
     dispatch(resetImage());
@@ -73,14 +69,18 @@ export function ImageEditor() {
         filePaths.map(async (filePath) => {
           const base64Data = await window.electron.readImageAsBase64(filePath);
           return {
-            id: generateId(),
+            id: generateImageId(),
             path: filePath,
             data: base64Data,
             settings: { rows: 1, columns: 1 },
           };
         })
       );
+      console.log('[ImageEditor] Adding images with IDs:', newImages.map(i => i.id));
       dispatch(addImages(newImages));
+      if (newImages.length > 0) {
+        dispatch(setActiveImage(newImages[0].id));
+      }
     }
   };
 
@@ -94,6 +94,7 @@ export function ImageEditor() {
       dispatch(updateImageSettings({ id: activeImageId, settings: { rows: preset.rows, columns: preset.columns } }));
     }
     dispatch(setUpscaleMode(preset.upscaleMode));
+    dispatch(setDownscaleMode(preset.downscaleMode));
     dispatch(setOutputFormat(preset.outputFormat));
   };
 
@@ -125,6 +126,10 @@ export function ImageEditor() {
   };
 
   const handleTelegramSubmit = async (data: { name: string; slug: string; botId: string }) => {
+    if (images.length === 0) {
+      alert('Нет изображений для обработки');
+      return;
+    }
     setTelegramDialogOpen(false);
     dispatch(setProcessing(true));
 
@@ -137,6 +142,7 @@ export function ImageEditor() {
       targetDir: `${packDir}/fragments`,
       outputFormat,
       upscaleMode,
+      downscaleMode,
     });
 
     if (!slicingResult.success) {
@@ -159,6 +165,7 @@ export function ImageEditor() {
         columns: globalSettings.columns,
         outputFormat,
         upscaleMode,
+        downscaleMode,
       },
       status: 'local' as const,
       isAnimated: images[0].path.toLowerCase().endsWith('.gif') || images[0].path.toLowerCase().endsWith('.apng'),
@@ -201,78 +208,69 @@ export function ImageEditor() {
     dispatch(setProcessing(false));
 
     if (telegramResult.success) {
-      alert(`Стикерпак создан!\nСсылка: ${telegramResult.packLink}`);
+      dispatch(resetImage());
+      dispatch(navigateTo('LIBRARY'));
     } else {
       alert(`Пак сохранен локально.\n\nОшибка загрузки в Telegram:\n${telegramResult.error}`);
+      dispatch(resetImage());
+      dispatch(navigateTo('LIBRARY'));
     }
-    
-    dispatch(resetImage());
-    dispatch(navigateTo('LIBRARY'));
   };
 
   const handleLocalSubmit = async (name: string) => {
+    if (images.length === 0) {
+      alert('Нет изображений для обработки');
+      return;
+    }
     setLocalDialogOpen(false);
     dispatch(setProcessing(true));
 
     const userDataPath = await window.electron.store.get('userDataPath') || '';
-    const packId = editingPack?.id || generatePackId();
+    const sanitizedName = name.replace(/[^a-zA-Z0-9а-яА-Я_-]/g, '_');
+    const packId = `${sanitizedName}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const packDir = `${userDataPath}/library/${packId}`;
+    console.log('[ImageEditor] Creating local pack:', packId);
 
     const result = await window.electron.startSlicing({
       images: images.map(img => ({ id: img.id, path: img.path, rows: img.settings.rows, columns: img.settings.columns })),
       targetDir: `${packDir}/fragments`,
       outputFormat,
       upscaleMode,
-      startIndex: editingPack?.nextFragmentIndex || 0,
+      downscaleMode,
     });
 
     dispatch(setProcessing(false));
 
     if (result.success) {
-      if (editingPack) {
-        await window.electron.updateManifest(packDir);
-        
-        const localPacks = await window.electron.store.get('localPacks') || [];
-        const updatedPack = {
-          ...editingPack,
-          fragmentCount: editingPack.fragmentCount + (result.filesCreated || 0),
-          nextFragmentIndex: (editingPack.nextFragmentIndex || 0) + (result.filesCreated || 0),
-        };
-        const updated = localPacks.map((p: LocalPack) => p.id === packId ? updatedPack : p);
-        await window.electron.store.set('localPacks', updated);
-        await window.electron.store.set('editingPackId', null);
-        
-        dispatch(resetImage());
-        dispatch(navigateTo('PACK_VIEW'));
-      } else {
-        const localPack = {
-          id: packId,
-          name,
-          createdAt: new Date().toISOString(),
-          previewPath: `${packDir}/preview.webp`,
-          originalImagePath: images[0].path,
-          fragmentsDir: `${packDir}/fragments`,
-          fragmentCount: result.filesCreated || 0,
-          nextFragmentIndex: result.filesCreated || 0,
-          settings: {
-            rows: globalSettings.rows,
-            columns: globalSettings.columns,
-            outputFormat,
-            upscaleMode,
-          },
-          status: 'local' as const,
-          isAnimated: images[0].path.toLowerCase().endsWith('.gif') || images[0].path.toLowerCase().endsWith('.apng'),
-        };
+      const localPack = {
+        id: packId,
+        name,
+        createdAt: new Date().toISOString(),
+        previewPath: `${packDir}/preview.webp`,
+        originalImagePath: images[0].path,
+        fragmentsDir: `${packDir}/fragments`,
+        fragmentCount: result.filesCreated || 0,
+        nextFragmentIndex: result.filesCreated || 0,
+        settings: {
+          rows: globalSettings.rows,
+          columns: globalSettings.columns,
+          outputFormat,
+          upscaleMode,
+          downscaleMode,
+        },
+        status: 'local' as const,
+        isAnimated: images[0].path.toLowerCase().endsWith('.gif') || images[0].path.toLowerCase().endsWith('.apng'),
+      };
 
-        await window.electron.savePack(packId, packDir, images[0].path, localPack);
-        
-        const localPacks = await window.electron.store.get('localPacks') || [];
-        await window.electron.store.set('localPacks', [...localPacks, localPack]);
-        
-        alert('Стикерпак сохранен!');
-        dispatch(resetImage());
-        dispatch(navigateTo('LIBRARY'));
-      }
+      await window.electron.savePack(packId, packDir, images[0].path, localPack);
+      await window.electron.updateManifest(packDir);
+      
+      const localPacks = await window.electron.store.get('localPacks') || [];
+      await window.electron.store.set('localPacks', [...localPacks, localPack]);
+      
+      alert('Стикерпак сохранен!');
+      dispatch(resetImage());
+      dispatch(navigateTo('LIBRARY'));
     } else {
       alert(result.message);
     }
@@ -280,6 +278,10 @@ export function ImageEditor() {
 
   const handleSaveToExistingPack = async () => {
     if (!editingPack) return;
+    if (images.length === 0) {
+      alert('Нет изображений для обработки');
+      return;
+    }
     
     dispatch(setProcessing(true));
 
@@ -291,6 +293,7 @@ export function ImageEditor() {
       targetDir: `${packDir}/fragments`,
       outputFormat,
       upscaleMode,
+      downscaleMode,
       startIndex: editingPack.nextFragmentIndex || 0,
     });
 
@@ -315,7 +318,7 @@ export function ImageEditor() {
     }
   };
 
-  if (images.length === 0) return null;
+  if (isLoading && images.length === 0) return null;
 
   return (
     <div className={styles.container}>
@@ -350,6 +353,14 @@ export function ImageEditor() {
             <option value="none">Без апскейлера</option>
             <option value="soft">Мягкий (фото/видео)</option>
             <option value="sharp">Четкий (текст/логотипы)</option>
+          </select>
+        </div>
+
+        <div className={styles.sidebar__section}>
+          <label className={styles.sidebar__label}>Режим уменьшения</label>
+          <select className={styles.select} value={downscaleMode} onChange={(e) => dispatch(setDownscaleMode(e.target.value as DownscaleMode))}>
+            <option value="none">Без обработки</option>
+            <option value="highQuality">High Quality (Lanczos)</option>
           </select>
         </div>
 
@@ -394,11 +405,10 @@ export function ImageEditor() {
 
         <div className={styles.buttonGroup}>
           <Button 
-            icon={<UploadIcon width={18} height={18} />}
             onClick={() => editingPack ? handleSaveToExistingPack() : setTelegramDialogOpen(true)} 
             disabled={isProcessing}
           >
-            {editingPack ? 'Сохранить' : 'Создать пак в Telegram'}
+            {editingPack ? 'Сохранить' : 'Загрузить в ТГ'}
           </Button>
           {!editingPack && (
             <IconButton 
