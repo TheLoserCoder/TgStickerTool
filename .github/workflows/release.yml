@@ -29,9 +29,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
       
+      - name: Verify dependencies
+        run: npm ls --depth=0
+      
       - name: Install sharp for Windows
         if: matrix.os == 'windows-latest'
-        run: npm install --os=win32 --cpu=x64 sharp
+        run: |
+          npm install --os=win32 --cpu=x64 sharp
+          npm install --os=win32 --cpu=x64 @ffmpeg-installer/ffmpeg
       
       - name: Install sharp for Linux
         if: matrix.os == 'ubuntu-latest'
@@ -39,6 +44,7 @@ jobs:
           npm install --force --cpu=x64 --os=linux sharp
           ls -la node_modules/sharp/
           ls -la node_modules/@img/ || echo "@img not found"
+          npm ls sharp || true
       
       - name: Build
         run: npm run build

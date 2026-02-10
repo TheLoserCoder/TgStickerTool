@@ -5,24 +5,20 @@ exports.default = async function(context) {
   const appOutDir = context.appOutDir;
   const platform = context.electronPlatformName;
   
-  if (platform === 'linux') {
-    const sharpSource = path.join(context.packager.info._appDir, 'node_modules', 'sharp');
-    const imgSource = path.join(context.packager.info._appDir, 'node_modules', '@img');
+  const modulesToCopy = ['sharp', '@img', 'detect-libc', 'semver', 'fluent-ffmpeg', '@ffmpeg-installer'];
+  
+  if (platform === 'linux' || platform === 'win32') {
     const resourcesDir = path.join(appOutDir, 'resources');
     const appAsarUnpacked = path.join(resourcesDir, 'app.asar.unpacked', 'node_modules');
     
-    // Копируем sharp
-    if (fs.existsSync(sharpSource)) {
-      const sharpDest = path.join(appAsarUnpacked, 'sharp');
-      fs.cpSync(sharpSource, sharpDest, { recursive: true });
-      console.log('Copied sharp to app.asar.unpacked');
-    }
-    
-    // Копируем @img
-    if (fs.existsSync(imgSource)) {
-      const imgDest = path.join(appAsarUnpacked, '@img');
-      fs.cpSync(imgSource, imgDest, { recursive: true });
-      console.log('Copied @img to app.asar.unpacked');
+    for (const moduleName of modulesToCopy) {
+      const moduleSource = path.join(context.packager.info._appDir, 'node_modules', moduleName);
+      
+      if (fs.existsSync(moduleSource)) {
+        const moduleDest = path.join(appAsarUnpacked, moduleName);
+        fs.cpSync(moduleSource, moduleDest, { recursive: true });
+        console.log(`Copied ${moduleName} to app.asar.unpacked`);
+      }
     }
   }
 };

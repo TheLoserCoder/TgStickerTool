@@ -31,7 +31,9 @@
       "**/node_modules/sharp/**/*",
       "**/node_modules/@img/**/*",
       "**/node_modules/detect-libc/**/*",
-      "**/node_modules/@ffmpeg-installer/**/*"
+      "**/node_modules/semver/**/*",
+      "**/node_modules/@ffmpeg-installer/**/*",
+      "**/node_modules/fluent-ffmpeg/**/*"
     ],
     "files": [
       "dist/**/*",
@@ -41,16 +43,23 @@
       "node_modules/sharp/**/*",
       "node_modules/@img/**/*",
       "node_modules/detect-libc/**/*",
-      "node_modules/@ffmpeg-installer/**/*"
+      "node_modules/semver/**/*",
+      "node_modules/@ffmpeg-installer/**/*",
+      "node_modules/fluent-ffmpeg/**/*"
     ],
     "directories": {
       "output": "release"
     },
     "extraResources": [
       {
-        "from": "node_modules/@ffmpeg-installer/ffmpeg/bin",
+        "from": "node_modules/@ffmpeg-installer/linux-x64",
         "to": "ffmpeg-bin",
-        "filter": ["**/*"]
+        "filter": ["ffmpeg"]
+      },
+      {
+        "from": "node_modules/@ffmpeg-installer/win32-x64",
+        "to": "ffmpeg-bin",
+        "filter": ["ffmpeg.exe"]
       }
     ],
     "win": {
@@ -64,7 +73,9 @@
       "asarUnpack": [
         "**/node_modules/sharp/**/*",
         "**/node_modules/@img/**/*",
-        "**/node_modules/detect-libc/**/*"
+        "**/node_modules/detect-libc/**/*",
+        "**/node_modules/semver/**/*",
+        "**/node_modules/fluent-ffmpeg/**/*"
       ]
     },
     "nsis": {
@@ -103,6 +114,7 @@
     "fluent-ffmpeg": "^2.1.3",
     "grammy": "^1.39.3",
     "detect-libc": "^2.0.3",
+    "semver": "^7.6.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-redux": "^9.2.0",
