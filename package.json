@@ -23,6 +23,7 @@
     "productName": "TgStickerTool",
     "files": [
       "dist/**/*",
+      "public/**/*",
       "package.json"
     ],
     "directories": {
