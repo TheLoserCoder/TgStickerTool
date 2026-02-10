@@ -1,0 +1,58 @@
+@use '../../../shared/styles/variables' as *;
+
+.iconButton {
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: $radius-md;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all $transition-fast;
+  flex-shrink: 0;
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.primary {
+  background: $accent-primary;
+  color: $bg-primary;
+
+  &:hover:not(:disabled) {
+    background: $accent-hover;
+  }
+}
+
+.secondary {
+  background: $bg-secondary;
+  color: $text-primary;
+  border: 1px solid $border-color;
+
+  &:hover:not(:disabled) {
+    background: $bg-primary;
+    border-color: $accent-primary;
+  }
+}
+
+.danger {
+  background: rgba(220, 38, 38, 0.9);
+  color: white;
+
+  &:hover:not(:disabled) {
+    background: rgba(220, 38, 38, 1);
+  }
+}
+
+.ghost {
+  background: transparent;
+  color: $text-secondary;
+
+  &:hover:not(:disabled) {
+    color: $text-primary;
+    background: rgba(255, 255, 255, 0.05);
+  }
+}

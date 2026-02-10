@@ -1,0 +1,78 @@
+@use '../../shared/styles/variables' as *;
+
+.container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: $bg-primary;
+}
+
+.header {
+  padding: $spacing-lg $spacing-xl;
+  background-color: $bg-secondary;
+  border-bottom: 1px solid $border-color;
+
+  &__title {
+    margin: 0;
+    font-size: 1.5rem;
+    color: $text-primary;
+  }
+}
+
+.content {
+  flex: 1;
+  padding: $spacing-xl;
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-lg;
+}
+
+.actions {
+  display: flex;
+  gap: $spacing-md;
+  flex-wrap: wrap;
+}
+
+.button {
+  padding: $spacing-md $spacing-lg;
+  font-size: 1rem;
+  border: none;
+  border-radius: $radius-md;
+  background: $accent-primary;
+  color: $bg-primary;
+  cursor: pointer;
+  transition: background $transition-normal;
+  font-weight: 500;
+
+  &:hover {
+    background: $accent-hover;
+  }
+
+  &--secondary {
+    background: $bg-secondary;
+    color: $text-primary;
+    border: 1px solid $border-color;
+
+    &:hover {
+      background: $bg-primary;
+    }
+  }
+}
+
+.modalContent {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-md;
+
+  &__text {
+    color: $text-primary;
+    line-height: 1.5;
+  }
+
+  &__actions {
+    display: flex;
+    gap: $spacing-sm;
+    justify-content: flex-end;
+    margin-top: $spacing-md;
+  }
+}

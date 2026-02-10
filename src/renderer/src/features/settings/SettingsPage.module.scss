@@ -1,0 +1,237 @@
+@use '../../shared/styles/variables' as *;
+
+.container {
+  display: flex;
+  height: 100vh;
+  background-color: $bg-primary;
+}
+
+.sidebar {
+  width: 250px;
+  background-color: $bg-secondary;
+  border-right: 1px solid $border-color;
+  padding: $spacing-lg;
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-lg;
+}
+
+.backButton {
+  padding: $spacing-sm $spacing-md;
+  background: transparent;
+  border: none;
+  color: $text-secondary;
+  cursor: pointer;
+  text-align: left;
+  font-size: 0.875rem;
+  transition: color $transition-fast;
+
+  &:hover {
+    color: $text-primary;
+  }
+}
+
+.tabs {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-xs;
+}
+
+.tab {
+  padding: $spacing-md;
+  background: transparent;
+  border: none;
+  color: $text-secondary;
+  cursor: pointer;
+  text-align: left;
+  border-radius: $radius-sm;
+  transition: all $transition-fast;
+
+  &:hover {
+    background: $bg-primary;
+    color: $text-primary;
+  }
+
+  &.active {
+    background: $accent-primary;
+    color: $bg-primary;
+  }
+}
+
+.content {
+  flex: 1;
+  padding: $spacing-xl;
+  overflow-y: auto;
+}
+
+.section {
+  max-width: 800px;
+}
+
+.title {
+  font-size: 1.5rem;
+  color: $text-primary;
+  margin: 0 0 $spacing-lg;
+}
+
+.botCard {
+  display: flex;
+  gap: $spacing-md;
+  align-items: center;
+  padding: $spacing-md;
+  background: $bg-secondary;
+  border-radius: $radius-md;
+  margin-bottom: $spacing-md;
+}
+
+.botInfo {
+  flex: 1;
+}
+
+.botName {
+  font-weight: 500;
+  color: $text-primary;
+  margin-bottom: $spacing-xs;
+}
+
+.botToken {
+  font-size: 0.875rem;
+  color: $text-secondary;
+  font-family: monospace;
+}
+
+.botOwnerId {
+  font-size: 0.875rem;
+  color: $text-secondary;
+  margin-top: $spacing-xs;
+}
+
+.input {
+  flex: 1;
+  padding: $spacing-sm;
+  background: $bg-primary;
+  border: 1px solid $border-color;
+  border-radius: $radius-sm;
+  color: $text-primary;
+
+  &:focus {
+    outline: none;
+    border-color: $accent-primary;
+  }
+}
+
+.inputSmall {
+  width: 80px;
+  padding: $spacing-sm;
+  background: $bg-primary;
+  border: 1px solid $border-color;
+  border-radius: $radius-sm;
+  color: $text-primary;
+
+  &:focus {
+    outline: none;
+    border-color: $accent-primary;
+  }
+}
+
+.select {
+  padding: $spacing-sm;
+  background: $bg-primary;
+  border: 1px solid $border-color;
+  border-radius: $radius-sm;
+  color: $text-primary;
+
+  &:focus {
+    outline: none;
+    border-color: $accent-primary;
+  }
+}
+
+.button {
+  padding: $spacing-sm $spacing-md;
+  background: $accent-primary;
+  border: none;
+  border-radius: $radius-sm;
+  color: $bg-primary;
+  cursor: pointer;
+  font-weight: 500;
+
+  &:hover {
+    background: $accent-hover;
+  }
+}
+
+.buttonSecondary {
+  padding: $spacing-sm $spacing-md;
+  background: $bg-primary;
+  border: 1px solid $border-color;
+  border-radius: $radius-sm;
+  color: $text-primary;
+  cursor: pointer;
+
+  &:hover {
+    border-color: $accent-primary;
+  }
+}
+
+.buttonDanger {
+  padding: $spacing-sm $spacing-md;
+  background: transparent;
+  border: 1px solid #e74c3c;
+  border-radius: $radius-sm;
+  color: #e74c3c;
+  cursor: pointer;
+
+  &:hover {
+    background: #e74c3c;
+    color: white;
+  }
+}
+
+.presetForm {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: $spacing-sm $spacing-md;
+  align-items: center;
+  margin-bottom: $spacing-lg;
+
+  .button {
+    grid-column: 2;
+  }
+}
+
+.label {
+  font-size: 0.875rem;
+  color: $text-secondary;
+  font-weight: 500;
+}
+
+.presetList {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-sm;
+}
+
+.presetCard {
+  display: flex;
+  align-items: center;
+  gap: $spacing-md;
+  padding: $spacing-md;
+  background: $bg-secondary;
+  border-radius: $radius-md;
+}
+
+.presetName {
+  flex: 1;
+  font-weight: 500;
+  color: $text-primary;
+}
+
+.presetDetails {
+  font-size: 0.875rem;
+  color: $text-secondary;
+}
+
+.addButton {
+  margin-bottom: $spacing-lg;
+}

@@ -1,0 +1,100 @@
+@use '../../shared/styles/variables' as *;
+
+.container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background-color: $bg-primary;
+  padding: $spacing-xl;
+}
+
+.card {
+  background: $bg-secondary;
+  border-radius: $radius-lg;
+  padding: $spacing-xl;
+  max-width: 500px;
+  width: 100%;
+  border: 1px solid $border-color;
+}
+
+.title {
+  font-size: 1.75rem;
+  color: $text-primary;
+  margin: 0 0 $spacing-sm;
+}
+
+.subtitle {
+  color: $text-secondary;
+  margin: 0 0 $spacing-xl;
+  font-size: 0.875rem;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-lg;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-sm;
+}
+
+.label {
+  font-size: 0.875rem;
+  color: $text-secondary;
+  font-weight: 500;
+}
+
+.input {
+  padding: $spacing-md;
+  background: $bg-primary;
+  border: 1px solid $border-color;
+  border-radius: $radius-md;
+  color: $text-primary;
+  font-size: 1rem;
+
+  &:focus {
+    outline: none;
+    border-color: $accent-primary;
+  }
+}
+
+.button {
+  padding: $spacing-md;
+  font-size: 1rem;
+  border: none;
+  border-radius: $radius-md;
+  background: $accent-primary;
+  color: $bg-primary;
+  cursor: pointer;
+  transition: background $transition-normal;
+  font-weight: 500;
+
+  &:hover {
+    background: $accent-hover;
+  }
+}
+
+.helper {
+  font-size: 0.75rem;
+  color: $text-secondary;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.link {
+  background: none;
+  border: none;
+  color: $accent-primary;
+  cursor: pointer;
+  padding: 0;
+  font-size: inherit;
+  text-decoration: underline;
+
+  &:hover {
+    color: $accent-hover;
+  }
+}

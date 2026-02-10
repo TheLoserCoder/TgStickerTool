@@ -1,0 +1,64 @@
+@use '../../shared/styles/variables' as *;
+
+.container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background-color: $bg-primary;
+  gap: $spacing-xl;
+  position: relative;
+}
+
+.settingsButton {
+  position: absolute;
+  top: $spacing-lg;
+  right: $spacing-lg;
+  border-radius: 50%;
+  transition: transform $transition-fast;
+
+  &:hover {
+    transform: rotate(90deg);
+  }
+}
+
+.title {
+  font-size: 2rem;
+  color: $text-primary;
+  margin: 0;
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-md;
+}
+
+.button {
+  padding: $spacing-md $spacing-xl;
+  font-size: 1rem;
+  border: none;
+  border-radius: $radius-md;
+  background: $accent-primary;
+  color: $bg-primary;
+  cursor: pointer;
+  transition: background $transition-normal;
+  font-weight: 500;
+  min-width: 250px;
+
+  &:hover {
+    background: $accent-hover;
+  }
+}
+
+.buttonSecondary {
+  background: transparent;
+  border: 1px solid $border-color;
+  color: $text-primary;
+
+  &:hover {
+    border-color: $accent-primary;
+    background: transparent;
+  }
+}

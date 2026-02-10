@@ -4,13 +4,17 @@ export default defineConfig({
   build: {
     outDir: 'dist/main',
     lib: {
-      entry: 'src/main/main.ts',
+      entry: {
+        main: 'src/main/main.ts',
+        tileWorker: 'src/main/tileWorker.ts',
+      },
       formats: ['cjs'],
-      fileName: () => 'main.js',
+      fileName: (format, entryName) => `${entryName}.js`,
     },
     rollupOptions: {
-      external: ['electron'],
+      external: ['electron', 'path', 'fs', 'os', 'sharp', 'fluent-ffmpeg', '@ffmpeg-installer/ffmpeg', 'worker_threads', 'electron-store'],
     },
     emptyOutDir: true,
+    target: 'node18',
   },
 });

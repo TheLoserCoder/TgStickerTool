@@ -12,5 +12,6 @@ export default defineConfig({
       external: ['electron'],
     },
     emptyOutDir: false,
+    target: 'node18',
   },
 });

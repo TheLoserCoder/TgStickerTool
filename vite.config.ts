@@ -7,6 +7,9 @@ export default defineConfig({
   build: {
     outDir: 'dist/renderer',
     emptyOutDir: true,
+    rollupOptions: {
+      external: ['electron-store'],
+    },
   },
   server: {
     port: 5173,

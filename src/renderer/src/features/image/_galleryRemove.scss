@@ -1,0 +1,31 @@
+.galleryRemove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s;
+
+  &:hover {
+    background: #e74c3c;
+  }
+}
+
+.galleryItem {
+  position: relative;
+
+  &:hover .galleryRemove {
+    opacity: 1;
+  }
+}

@@ -1,0 +1,354 @@
+@use '../../shared/styles/variables' as *;
+
+.container {
+  display: flex;
+  height: 100vh;
+  background-color: $bg-primary;
+}
+
+.sidebar {
+  width: 300px;
+  background-color: $bg-secondary;
+  border-right: 1px solid $border-color;
+  display: flex;
+  flex-direction: column;
+  padding: $spacing-lg;
+  gap: $spacing-lg;
+  overflow-y: auto;
+
+  &__section {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-sm;
+  }
+
+  &__label {
+    font-size: 0.875rem;
+    color: $text-secondary;
+    font-weight: 500;
+  }
+
+  &__spacer {
+    flex: 1;
+  }
+}
+
+.input {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: $spacing-sm;
+
+  &__field {
+    flex: 1;
+    min-width: 0;
+    max-width: 100px;
+    padding: $spacing-sm;
+    background: $bg-primary;
+    border: 1px solid $border-color;
+    border-radius: $radius-sm;
+    color: $text-primary;
+    font-size: 1rem;
+    text-align: center;
+
+    &:focus {
+      outline: none;
+      border-color: $accent-primary;
+    }
+
+    &::-webkit-inner-spin-button,
+    &::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+
+    &[type='number'] {
+      -moz-appearance: textfield;
+    }
+  }
+
+  &__button {
+    min-width: 40px;
+    height: 32px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: $bg-primary;
+    border: 1px solid $border-color;
+    border-radius: $radius-sm;
+    color: $text-primary;
+    cursor: pointer;
+    transition: all $transition-fast;
+    flex-shrink: 0;
+
+    &:hover {
+      background: $accent-primary;
+      color: $bg-primary;
+      border-color: $accent-primary;
+    }
+  }
+}
+
+.button {
+  padding: $spacing-md;
+  font-size: 1rem;
+  border: none;
+  border-radius: $radius-md;
+  background: $accent-primary;
+  color: $bg-primary;
+  cursor: pointer;
+  transition: background $transition-normal;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: $spacing-sm;
+
+  svg {
+    flex-shrink: 0;
+  }
+
+  &:hover:not(:disabled) {
+    background: $accent-hover;
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  &--secondary {
+    background: transparent;
+    color: $text-secondary;
+    border: none;
+    padding: $spacing-sm $spacing-md;
+    font-size: 0.875rem;
+
+    &:hover {
+      background: $bg-primary;
+      border: none;
+      color: $text-primary;
+    }
+  }
+
+  &--icon {
+    padding: $spacing-sm;
+    min-width: 44px;
+    background: $bg-primary;
+    border: 1px solid $border-color;
+    color: $text-primary;
+
+    &:hover:not(:disabled) {
+      background: $accent-primary;
+      color: $bg-primary;
+      border-color: $accent-primary;
+    }
+  }
+}
+
+.radioGroup {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-sm;
+}
+
+.radioItem {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+}
+
+.radioButton {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid $border-color;
+  background: $bg-primary;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &:hover {
+    border-color: $accent-primary;
+  }
+
+  &[data-state='checked'] {
+    border-color: $accent-primary;
+  }
+}
+
+.radioIndicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: $accent-primary;
+}
+
+.radioLabel {
+  font-size: 0.875rem;
+  color: $text-primary;
+  cursor: pointer;
+}
+
+.progressRoot {
+  position: relative;
+  overflow: hidden;
+  background: $bg-primary;
+  border-radius: $radius-sm;
+  width: 100%;
+  height: 8px;
+  margin-top: $spacing-sm;
+}
+
+.progressIndicator {
+  background: $accent-primary;
+  width: 100%;
+  height: 100%;
+  transition: transform 0.3s ease;
+}
+
+.mainContent {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.workspace {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: $spacing-xl;
+}
+
+.gallerySection {
+  height: 140px;
+  border-top: 1px solid $border-color;
+  background: $bg-secondary;
+  display: flex;
+  align-items: center;
+  padding: 0 $spacing-lg;
+  flex-shrink: 0;
+}
+
+.gallery {
+  display: flex;
+  gap: $spacing-md;
+  overflow-x: auto;
+  width: 100%;
+  padding: $spacing-md 0;
+}
+
+.galleryItem {
+  flex-shrink: 0;
+  width: 80px;
+  height: 80px;
+  border: 3px solid transparent;
+  border-radius: $radius-md;
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color $transition-fast;
+  position: relative;
+
+  &:hover {
+    border-color: $accent-hover;
+  }
+
+  &.active {
+    border-color: $accent-primary;
+  }
+}
+
+.galleryRemove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s;
+  z-index: 10;
+
+  &:hover {
+    background: #e74c3c;
+  }
+}
+
+.galleryItem:hover .galleryRemove {
+  opacity: 1;
+}
+
+.galleryAll {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: $bg-secondary;
+  color: $text-primary;
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.galleryThumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.progressInfo {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-xs;
+  font-size: 0.875rem;
+  color: $text-secondary;
+  padding: $spacing-md;
+  background: $bg-primary;
+  border-radius: $radius-md;
+}
+
+.buttonGroup {
+  display: flex;
+  gap: $spacing-sm;
+  align-items: stretch;
+  width: 100%;
+
+  > button {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+.select {
+  padding: $spacing-sm;
+  background: $bg-primary;
+  border: 1px solid $border-color;
+  border-radius: $radius-sm;
+  color: $text-primary;
+  font-size: 0.875rem;
+
+  &:focus {
+    outline: none;
+    border-color: $accent-primary;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    color: $text-secondary;
+  }
+}
