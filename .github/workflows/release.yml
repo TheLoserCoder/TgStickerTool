@@ -35,7 +35,7 @@ jobs:
       
       - name: Build Linux
         if: matrix.os == 'ubuntu-latest'
-        run: npx electron-builder --linux --AppImage
+        run: npx electron-builder -l --x64
       
       - name: Upload Windows artifacts
         if: matrix.os == 'windows-latest'
