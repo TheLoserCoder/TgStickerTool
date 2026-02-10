@@ -8,6 +8,7 @@ export interface ElectronAPI {
   deletePack: (packId: string, packDir: string) => Promise<void>;
   openFolder: (folderPath: string) => Promise<void>;
   getFragments: (fragmentsDir: string) => Promise<string[]>;
+  getGifs: () => Promise<string[]>;
   createTelegramPack: (params: TelegramPackParams) => Promise<TelegramPackResult>;
   onTelegramUploadProgress: (callback: (data: TelegramUploadProgress) => void) => void;
   onTelegramUploadComplete: (callback: (data: any) => void) => void;
@@ -164,6 +165,7 @@ export const IPC_CHANNELS = {
   DELETE_FRAGMENT: 'fs:deleteFragment',
   OPEN_FOLDER: 'fs:openFolder',
   GET_FRAGMENTS: 'fs:getFragments',
+  GET_GIFS: 'fs:getGifs',
   CREATE_TELEGRAM_PACK: 'telegram:createPack',
   TELEGRAM_UPLOAD_PROGRESS: 'telegram:uploadProgress',
   TELEGRAM_UPLOAD_COMPLETE: 'telegram:uploadComplete',

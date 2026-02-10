@@ -159,7 +159,6 @@ export function PackViewPage() {
   const handleUploadToTelegram = async (data?: { name: string; slug: string; botId: string }) => {
     if (!pack) return;
     
-    // Получаем актуальные данные пака
     const localPacks = await window.electron.store.get('localPacks') || [];
     const currentPack = localPacks.find((p: LocalPack) => p.id === pack.id);
     if (!currentPack) {
@@ -167,7 +166,6 @@ export function PackViewPage() {
       return;
     }
 
-    // Для обновления используем сохраненные данные, для создания - из диалога
     const isUpdate = currentPack.status === 'telegram' && currentPack.tgBotId && currentPack.tgUserId;
     
     if (!isUpdate && !data) {
@@ -198,13 +196,11 @@ export function PackViewPage() {
       return;
     }
 
-    // Получаем список файлов из папки
     const actualFragments = await window.electron.getFragments(currentPack.fragmentsDir);
     const actualFileNames = actualFragments.map(f => f.split('/').pop() || f.split('\\').pop() || '');
     
     console.log('[PackView] Actual files in folder:', actualFileNames.length, actualFileNames);
 
-    // Проверяем manifest
     const packDir = currentPack.fragmentsDir.replace('/fragments', '');
     const manifest = await window.electron.getManifest(packDir);
     
@@ -214,10 +210,7 @@ export function PackViewPage() {
     console.log('[PackView] Files in manifest:', manifestFileNames.length, manifestFileNames);
     console.log('[PackView] Uploaded in manifest:', uploadedFileNames.length, uploadedFileNames);
     
-    // Находим удаленные файлы (есть в manifest как uploaded, но нет в папке)
     const deletedFiles = uploadedFileNames.filter(f => !actualFileNames.includes(f));
-    
-    // Находим файлы, которых нет в manifest или которые pending
     const newFiles = actualFileNames.filter(f => !manifestFileNames.includes(f));
     const pendingFiles = manifestFileNames.filter(f => !uploadedFileNames.includes(f) && actualFileNames.includes(f));
     const filesToUpload = [...new Set([...newFiles, ...pendingFiles])];
@@ -227,31 +220,21 @@ export function PackViewPage() {
     console.log('[PackView] Pending files:', pendingFiles.length, pendingFiles);
     console.log('[PackView] Total files to upload:', filesToUpload.length);
     
-    if (isUpdate && filesToUpload.length === 0 && deletedFiles.length === 0) {
-      if (manifest?.pendingReorder && manifest?.order) {
-        setUploadProgress({ current: 1, total: 1, percent: 100, stage: 'uploading', message: 'Синхронизация порядка стикеров...' });
-        
-        console.log('[PackView] Calling reorderStickers with order:', manifest.order);
-        const reorderResult = await window.electron.reorderStickers(packDir, bot.token, manifest.order);
-        console.log('[PackView] Reorder result:', reorderResult);
-        
-        setIsUploading(false);
-        setUploadProgress(null);
-        
-        if (reorderResult.success) {
-          alert(`Порядок обновлен! Перемещено стикеров: ${reorderResult.moved || 0}`);
-        } else {
-          alert(`Ошибка изменения порядка: ${reorderResult.error}`);
-        }
-        return;
-      }
-      
-      console.log('[PackView] No file or order changes, proceeding to check title');
+    const hasChanges = filesToUpload.length > 0 || deletedFiles.length > 0;
+    const hasReorder = manifest?.pendingReorder && manifest?.order;
+    const hasTitleChange = isUpdate && currentPack.tgLink && name !== pack.name;
+    
+    if (isUpdate && !hasChanges && !hasReorder && !hasTitleChange) {
+      setIsUploading(false);
+      setUploadProgress(null);
+      alert('Нет изменений для обновления');
+      return;
     }
 
     const packName = isUpdate && currentPack.tgLink ? 
       currentPack.tgLink.split('/').pop() : data!.slug;
 
+    // Выполняем обновление (удаления, добавления, заголовок)
     const telegramResult = await window.electron.createTelegramPack({
       packId: currentPack.id,
       userId,
@@ -266,11 +249,34 @@ export function PackViewPage() {
       deletedFiles: deletedFiles,
     });
 
-    setIsUploading(false);
-    setUploadProgress(null);
-
     if (!telegramResult.success) {
+      setIsUploading(false);
+      setUploadProgress(null);
       alert(`Ошибка загрузки в Telegram:\n${telegramResult.error}`);
+      return;
+    }
+
+    // После успешного обновления выполняем перемещение если нужно
+    if (isUpdate && hasReorder) {
+      setUploadProgress({ current: 1, total: 1, percent: 100, stage: 'uploading', message: 'Синхронизация порядка стикеров...' });
+      
+      console.log('[PackView] Calling reorderStickers with order:', manifest.order);
+      const reorderResult = await window.electron.reorderStickers(packDir, bot.token, manifest.order);
+      console.log('[PackView] Reorder result:', reorderResult);
+      
+      if (reorderResult.success) {
+        await loadPackData();
+        setIsUploading(false);
+        setUploadProgress(null);
+        alert(`Обновление завершено! Перемещено стикеров: ${reorderResult.moved || 0}`);
+      } else {
+        setIsUploading(false);
+        setUploadProgress(null);
+        alert(`Обновлено, но ошибка изменения порядка: ${reorderResult.error}`);
+      }
+    } else {
+      setIsUploading(false);
+      setUploadProgress(null);
     }
   };
 

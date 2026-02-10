@@ -23,6 +23,19 @@
   }
 }
 
+.header {
+  display: flex;
+  align-items: flex-end;
+  gap: $spacing-lg;
+}
+
+.gif {
+  max-height: 200px;
+  width: auto;
+  object-fit: contain;
+  object-position: bottom;
+}
+
 .title {
   font-size: 2rem;
   color: $text-primary;

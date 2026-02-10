@@ -17,6 +17,8 @@ contextBridge.exposeInMainWorld('electron', {
     ipcRenderer.invoke(IPC_CHANNELS.OPEN_FOLDER, folderPath),
   getFragments: (fragmentsDir: string) => 
     ipcRenderer.invoke(IPC_CHANNELS.GET_FRAGMENTS, fragmentsDir),
+  getGifs: () => 
+    ipcRenderer.invoke(IPC_CHANNELS.GET_GIFS),
   createTelegramPack: (params: TelegramPackParams) =>
     ipcRenderer.invoke(IPC_CHANNELS.CREATE_TELEGRAM_PACK, params),
   onTelegramUploadProgress: (callback: (data: TelegramUploadProgress) => void) => {

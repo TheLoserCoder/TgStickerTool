@@ -202,6 +202,22 @@ ipcMain.handle(IPC_CHANNELS.GET_FRAGMENTS, async (_, fragmentsDir: string) => {
   }
 });
 
+ipcMain.handle(IPC_CHANNELS.GET_GIFS, async () => {
+  try {
+    const gifsDir = path.join(__dirname, '../public/gifs');
+    if (!fs.existsSync(gifsDir)) {
+      return [];
+    }
+    const files = fs.readdirSync(gifsDir)
+      .filter(f => f.toLowerCase().endsWith('.gif'))
+      .map(f => `../gifs/${f}`);
+    return files;
+  } catch (error) {
+    console.error('Error getting gifs:', error);
+    return [];
+  }
+});
+
 ipcMain.handle(IPC_CHANNELS.GET_MANIFEST, async (_, packDir: string) => {
   try {
     const manifestPath = path.join(packDir, 'manifest.json');
