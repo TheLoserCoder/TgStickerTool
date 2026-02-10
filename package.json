@@ -1,7 +1,7 @@
 {
   "name": "tgstickertool",
   "version": "1.0.0",
-  "description": "",
+  "description": "Telegram Sticker Tool built with Electron",
   "main": "dist/main/main.js",
   "scripts": {
     "dev:vite": "vite",
