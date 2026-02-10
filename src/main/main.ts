@@ -204,13 +204,20 @@ ipcMain.handle(IPC_CHANNELS.GET_FRAGMENTS, async (_, fragmentsDir: string) => {
 
 ipcMain.handle(IPC_CHANNELS.GET_GIFS, async () => {
   try {
-    const gifsDir = path.join(__dirname, '../public/gifs');
+    const isDev = process.env.NODE_ENV === 'development';
+    const gifsDir = isDev 
+      ? path.join(__dirname, '../../public/gifs')
+      : path.join(process.resourcesPath, 'public/gifs');
+    
     if (!fs.existsSync(gifsDir)) {
+      console.log('Gifs directory not found:', gifsDir);
       return [];
     }
+    
     const files = fs.readdirSync(gifsDir)
       .filter(f => f.toLowerCase().endsWith('.gif'))
-      .map(f => `../gifs/${f}`);
+      .map(f => path.join(gifsDir, f));
+    
     return files;
   } catch (error) {
     console.error('Error getting gifs:', error);

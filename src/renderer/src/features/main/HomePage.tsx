@@ -19,7 +19,9 @@ export function HomePage() {
         const gifs = await window.electron.getGifs();
         if (gifs.length > 0) {
           const randomIndex = Math.floor(Math.random() * gifs.length);
-          setRandomGif(gifs[randomIndex]);
+          const gifPath = gifs[randomIndex];
+          // Конвертируем абсолютный путь в file:// URL для Electron
+          setRandomGif(`file://${gifPath}`);
         }
       } catch (error) {
         console.error('Failed to load gifs:', error);
