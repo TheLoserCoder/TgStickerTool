@@ -31,11 +31,11 @@ jobs:
       
       - name: Rebuild native modules for Windows
         if: matrix.os == 'windows-latest'
-        run: npm install --os=win32 --cpu=x64 sharp @ffmpeg-installer/ffmpeg
+        run: npm install --include=optional --os=win32 --cpu=x64 sharp
       
       - name: Rebuild native modules for Linux
         if: matrix.os == 'ubuntu-latest'
-        run: npm install --os=linux --cpu=x64 sharp @ffmpeg-installer/ffmpeg
+        run: npm install --include=optional --os=linux --cpu=x64 sharp
       
       - name: Build
         run: npm run build
@@ -44,13 +44,13 @@ jobs:
         if: matrix.os == 'windows-latest'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npx electron-builder --win --x64 --publish always
+        run: npx electron-builder --win --x64 -c.extraMetadata.main=dist/main/main.js --publish always
       
       - name: Build Linux
         if: matrix.os == 'ubuntu-latest'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npx electron-builder --linux appimage --x64 --publish always
+        run: npx electron-builder --linux --x64 -c.extraMetadata.main=dist/main/main.js --publish always
       
       - name: Upload Windows artifacts
         if: matrix.os == 'windows-latest'

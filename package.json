@@ -22,6 +22,10 @@
     "appId": "com.tgstickertool.app",
     "productName": "TgStickerTool",
     "npmRebuild": true,
+    "asarUnpack": [
+      "**/node_modules/sharp/**/*",
+      "**/node_modules/@ffmpeg-installer/**/*"
+    ],
     "files": [
       "dist/**/*",
       "public/**/*",
