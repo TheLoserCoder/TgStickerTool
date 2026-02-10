@@ -21,19 +21,23 @@
   "build": {
     "appId": "com.tgstickertool.app",
     "productName": "TgStickerTool",
-    "npmRebuild": true,
+    "npmRebuild": false,
     "extraMetadata": {
       "main": "dist/main/main.js"
     },
+    "asar": true,
     "asarUnpack": [
       "**/node_modules/sharp/**/*",
+      "**/node_modules/@img/**/*",
       "**/node_modules/@ffmpeg-installer/**/*"
     ],
     "files": [
       "dist/**/*",
       "public/**/*",
       "package.json",
+      "!node_modules",
       "node_modules/sharp/**/*",
+      "node_modules/@img/**/*",
       "node_modules/@ffmpeg-installer/**/*"
     ],
     "directories": {
@@ -53,7 +57,11 @@
     "linux": {
       "target": "AppImage",
       "icon": "build/icon_linux.png",
-      "category": "Utility"
+      "category": "Utility",
+      "asarUnpack": [
+        "**/node_modules/sharp/**/*",
+        "**/node_modules/@img/**/*"
+      ]
     },
     "nsis": {
       "oneClick": false,
