@@ -54,8 +54,22 @@
       }
     ],
     "win": {
-      "target": "nsis",
-      "icon": "build/icon_windows.ico"
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "build/icon_windows.ico",
+      "asarUnpack": [
+        "**/node_modules/sharp/**/*",
+        "**/node_modules/@img/**/*",
+        "**/node_modules/@ffmpeg-installer/**/*"
+      ]
     },
     "linux": {
       "target": "AppImage",
