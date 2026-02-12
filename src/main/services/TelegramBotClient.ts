@@ -129,11 +129,9 @@ export class TelegramBotClient implements IStickerProvider {
           const result = await this.addSticker(userId, finalName, stickers[i], stickerFormat);
           
           if (!result.success) {
-            return {
-              success: false,
-              error: `Ошибка при добавлении стикера ${i + 1}/${stickers.length}`,
-              errorCode: 'UPLOAD_FAILED',
-            };
+            console.warn(`[TelegramBot] Failed to add sticker ${i + 1}: ${result.error}`);
+          } else if (result.fileId) {
+            stickers[i].fileId = result.fileId;
           }
           
           onProgress?.(i + 1, stickers.length);
@@ -166,15 +164,25 @@ export class TelegramBotClient implements IStickerProvider {
             );
             
             console.log('[TelegramBot] Custom emoji set created with all stickers at once');
+            
+            // Получаем fileId для всех загруженных стикеров
+            const stickerSet = await this.getStickerSet(finalName);
+            if (stickerSet?.stickers) {
+              for (let i = 0; i < Math.min(stickers.length, stickerSet.stickers.length); i++) {
+                stickers[i].fileId = stickerSet.stickers[i].file_id;
+              }
+              console.log('[TelegramBot] Synced fileIds for', stickerSet.stickers.length, 'stickers');
+            }
+            
             if (onProgress) {
               for (let i = 1; i <= stickers.length; i++) {
                 onProgress(i, stickers.length);
               }
             }
           } catch (error: any) {
-            // Если получили ошибку 413, создаем пак по одному стикеру
-            if (error.error_code === 413 || error.message?.includes('413') || error.message?.includes('Request Entity Too Large')) {
-              console.log('[TelegramBot] Bulk upload failed (413), falling back to one-by-one upload');
+            // Если получили ошибку STICKER_VIDEO_LONG, создаем пак по одному стикеру
+            if (error.message?.includes('STICKER_VIDEO_LONG')) {
+              console.log('[TelegramBot] Bulk upload failed (STICKER_VIDEO_LONG), falling back to one-by-one upload');
               
               const firstStickerBuffer = fs.readFileSync(firstSticker.filePath);
               const isWebm = firstSticker.filePath.endsWith('.webm');
@@ -202,11 +210,54 @@ export class TelegramBotClient implements IStickerProvider {
                 const result = await this.addSticker(userId, finalName, stickers[i], stickerFormat);
                 
                 if (!result.success) {
-                  return {
-                    success: false,
-                    error: `Ошибка при загрузке эмодзи ${i + 1}/${stickers.length}`,
-                    errorCode: 'UPLOAD_FAILED',
-                  };
+                  if (result.error?.includes('STICKER_VIDEO_LONG')) {
+                    console.warn(`[TelegramBot] Skipping emoji ${i + 1}: video too long`);
+                  } else {
+                    console.warn(`[TelegramBot] Failed to add emoji ${i + 1}: ${result.error}`);
+                  }
+                } else if (result.fileId) {
+                  stickers[i].fileId = result.fileId;
+                }
+                
+                onProgress?.(i + 1, stickers.length);
+                await this.delay(stickers[i].filePath.endsWith('.webm') ? 800 : 400);
+              }
+            } else if (error.error_code === 413 || error.message?.includes('413') || error.message?.includes('Request Entity Too Large')) {
+              console.log('[TelegramBot] Bulk upload failed, falling back to one-by-one upload');
+              
+              const firstStickerBuffer = fs.readFileSync(firstSticker.filePath);
+              const isWebm = firstSticker.filePath.endsWith('.webm');
+              const actualFormat = isWebm ? 'video' : stickerFormat;
+              
+              await this.bot.api.createNewStickerSet(
+                userId,
+                finalName,
+                title,
+                [
+                  {
+                    sticker: new InputFile(firstStickerBuffer, isWebm ? 'sticker.webm' : 'sticker.webp'),
+                    emoji_list: [firstSticker.emoji],
+                    format: actualFormat,
+                  },
+                ],
+                { sticker_type: 'custom_emoji' }
+              );
+              
+              console.log('[TelegramBot] Custom emoji set created with first sticker');
+              onProgress?.(1, stickers.length);
+              
+              for (let i = 1; i < stickers.length; i++) {
+                console.log(`[TelegramBot] Adding custom emoji ${i + 1}/${stickers.length}`);
+                const result = await this.addSticker(userId, finalName, stickers[i], stickerFormat);
+                
+                if (!result.success) {
+                  if (result.error?.includes('STICKER_VIDEO_LONG')) {
+                    console.warn(`[TelegramBot] Skipping emoji ${i + 1}: video too long`);
+                  } else {
+                    console.warn(`[TelegramBot] Failed to add emoji ${i + 1}: ${result.error}`);
+                  }
+                } else if (result.fileId) {
+                  stickers[i].fileId = result.fileId;
                 }
                 
                 onProgress?.(i + 1, stickers.length);
@@ -243,11 +294,7 @@ export class TelegramBotClient implements IStickerProvider {
             const result = await this.addSticker(userId, finalName, stickers[i], stickerFormat);
             
             if (!result.success) {
-              return {
-                success: false,
-                error: `Ошибка при загрузке стикера ${i + 1}/${stickers.length}`,
-                errorCode: 'UPLOAD_FAILED',
-              };
+              console.warn(`[TelegramBot] Failed to add sticker ${i + 1}: ${result.error}`);
             }
             
             onProgress?.(i + 1, stickers.length);
@@ -265,7 +312,7 @@ export class TelegramBotClient implements IStickerProvider {
     }
   }
 
-  async addSticker(userId: number, packName: string, sticker: StickerData, format: string): Promise<{ success: boolean; fileId?: string }> {
+  async addSticker(userId: number, packName: string, sticker: StickerData, format: string): Promise<{ success: boolean; fileId?: string; error?: string }> {
     try {
       console.log('[TelegramBot] Adding sticker to pack:', packName);
       const stickerBuffer = fs.readFileSync(sticker.filePath);
@@ -292,7 +339,7 @@ export class TelegramBotClient implements IStickerProvider {
       return { success: true };
     } catch (error: any) {
       console.error('[TelegramBot] Error adding sticker:', error);
-      return { success: false };
+      return { success: false, error: error.message || 'Unknown error' };
     }
   }
 

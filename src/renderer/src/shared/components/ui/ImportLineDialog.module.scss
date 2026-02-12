@@ -1,0 +1,146 @@
+@use '../../styles/variables' as *;
+
+.overlay {
+  background-color: rgba(0, 0, 0, 0.5);
+  position: fixed;
+  inset: 0;
+  animation: overlayShow 150ms cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 1000;
+}
+
+.content {
+  background-color: $bg-secondary;
+  border-radius: 8px;
+  box-shadow: 0 10px 38px -10px rgba(0, 0, 0, 0.35), 0 10px 20px -15px rgba(0, 0, 0, 0.2);
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 90vw;
+  max-width: 500px;
+  max-height: 85vh;
+  padding: 24px;
+  animation: contentShow 150ms cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 1001;
+
+  &:focus {
+    outline: none;
+  }
+}
+
+.title {
+  margin: 0;
+  font-weight: 600;
+  color: $text-primary;
+  font-size: 18px;
+  margin-bottom: 8px;
+}
+
+.description {
+  margin: 0 0 20px;
+  color: $text-secondary;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.form {
+  margin-bottom: 24px;
+}
+
+.input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid $border-color;
+  border-radius: 6px;
+  background-color: $bg-primary;
+  color: $text-primary;
+  font-size: 14px;
+  font-family: inherit;
+
+  &:focus {
+    outline: none;
+    border-color: $accent-primary;
+  }
+
+  &::placeholder {
+    color: $text-secondary;
+  }
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.closeButton {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: $text-secondary;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+
+  &:hover {
+    background-color: $bg-primary;
+  }
+
+  &:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px $accent-primary;
+  }
+}
+
+.progressSection {
+  margin: 24px 0;
+}
+
+.progressText {
+  margin-bottom: 12px;
+  color: $text-primary;
+  font-size: 14px;
+  text-align: center;
+}
+
+.progressRoot {
+  position: relative;
+  overflow: hidden;
+  background-color: $bg-primary;
+  border-radius: 99999px;
+  width: 100%;
+  height: 8px;
+}
+
+.progressIndicator {
+  background-color: $accent-primary;
+  width: 100%;
+  height: 100%;
+  transition: transform 0.3s ease;
+}
+
+@keyframes overlayShow {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes contentShow {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -48%) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}

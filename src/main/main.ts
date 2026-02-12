@@ -5,13 +5,46 @@ import * as os from 'os';
 import { Worker } from 'worker_threads';
 import sharp from 'sharp';
 import uniqueid from 'uniqueid';
+import axios from 'axios';
+import * as cheerio from 'cheerio';
 import { IPC_CHANNELS, SlicingParams, SlicingResult, ProgressData, TelegramPackParams, TelegramPackResult, LocalPack, FragmentManifest } from '../common/types';
 import { TelegramBotClient } from './services/TelegramBotClient';
 import { ManifestService } from './services/ManifestService';
 import { SyncResult } from './services/IStickerProvider';
+import { isAnimatedImage } from './utils/imageDetector';
 
 import Store from 'electron-store';
 const store = new Store();
+
+let hardwareEncoder: string | null = null;
+
+async function calculateTotalSteps(images: any[], preserveAnimation: boolean, tempDir: string): Promise<number> {
+  let steps = 0;
+  
+  for (const img of images) {
+    const isPng = /\.png$/i.test(img.path);
+    if (isPng && preserveAnimation) {
+      const buffer = fs.readFileSync(img.path);
+      const isApng = buffer.includes(Buffer.from('acTL'));
+      if (isApng) steps++; // apngWorker
+    }
+    
+    steps++; // prepareWorker
+    steps++; // resizeWorker
+    
+    const metadata = await sharp(img.path, { animated: true, limitInputPixels: false }).metadata();
+    const isAnimated = preserveAnimation && metadata.pages !== undefined && metadata.pages > 1;
+    
+    const fragmentCount = img.rows * img.columns;
+    steps += fragmentCount; // sliceWorker (по одному на фрагмент)
+    
+    if (isAnimated) {
+      steps += fragmentCount; // convertWorker (по одному на фрагмент)
+    }
+  }
+  
+  return steps;
+}
 
 protocol.registerSchemesAsPrivileged([
   { 
@@ -28,6 +61,27 @@ protocol.registerSchemesAsPrivileged([
 let mainWindow: BrowserWindow | null = null;
 let botClient: TelegramBotClient | null = null;
 
+function detectHardwareEncoder(): string | null {
+  try {
+    const { execSync } = require('child_process');
+    const ffmpegPath = process.env.NODE_ENV === 'development'
+      ? require('@ffmpeg-installer/ffmpeg').path
+      : path.join(process.resourcesPath, 'ffmpeg-bin', process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg');
+    
+    const output = execSync(`"${ffmpegPath}" -encoders`, { encoding: 'utf8' });
+    
+    if (output.includes('vp9_nvenc')) return 'vp9_nvenc';
+    if (output.includes('vp9_vaapi')) return 'vp9_vaapi';
+    if (output.includes('vp9_qsv')) return 'vp9_qsv';
+    if (output.includes('vp9_amf')) return 'vp9_amf';
+    
+    return null;
+  } catch (error) {
+    console.error('[Main] Failed to detect hardware encoder:', error);
+    return null;
+  }
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1200,
@@ -41,6 +95,13 @@ function createWindow() {
   });
 
   store.set('userDataPath', app.getPath('userData'));
+  
+  hardwareEncoder = detectHardwareEncoder();
+  if (hardwareEncoder) {
+    console.log('[Main] Hardware encoder detected:', hardwareEncoder);
+  } else {
+    console.log('[Main] No hardware encoder found, using software encoding');
+  }
 
   if (process.env.NODE_ENV === 'development') {
     mainWindow.loadURL('http://localhost:5173');
@@ -124,9 +185,11 @@ ipcMain.handle(IPC_CHANNELS.DELETE_PACK, async (_, packId: string, packDir: stri
   try {
     if (packDir && fs.existsSync(packDir)) {
       fs.rmSync(packDir, { recursive: true, force: true });
+      console.log('[Main] Deleted pack directory:', packDir);
     }
   } catch (error) {
     console.error('Error deleting pack:', error);
+    throw error;
   }
 });
 
@@ -424,9 +487,65 @@ ipcMain.handle(IPC_CHANNELS.REORDER_STICKERS, async (event, packDir: string, bot
   }
 });
 
+ipcMain.handle(IPC_CHANNELS.IMPORT_LINE_STICKERS, async (event, url: string) => {
+  try {
+    const https = require('https');
+    const httpsAgent = new https.Agent({ rejectUnauthorized: false });
+    const response = await axios.get(url, { httpsAgent });
+    const $ = cheerio.load(response.data);
+    const images: string[] = [];
+
+    $('li.mdCMN09Li').each((_, element) => {
+      const dataPreview = $(element).attr('data-preview');
+      if (dataPreview) {
+        try {
+          const previewData = JSON.parse(dataPreview);
+          const isAnimation = previewData.type === 'animation';
+          const template = isAnimation ? 'sticker_animation@2x.png' : 'sticker@2x.png';
+          
+          if (previewData.staticUrl) {
+            const baseUrl = previewData.staticUrl.substring(0, previewData.staticUrl.lastIndexOf('/'));
+            const stickerUrl = `${baseUrl}/${template}`;
+            images.push(stickerUrl);
+          }
+        } catch (e) {
+          console.error('[Main] Failed to parse data-preview:', e);
+        }
+      }
+    });
+
+    if (images.length === 0) {
+      return { success: false, error: 'Стикеры не найдены на странице' };
+    }
+
+    const tempDir = path.join(os.tmpdir(), `line_import_${Date.now()}`);
+    fs.mkdirSync(tempDir, { recursive: true });
+
+    const filePaths: string[] = [];
+    for (let i = 0; i < images.length; i++) {
+      const imageUrl = images[i];
+      try {
+        event.sender.send('line-import-progress', { current: i + 1, total: images.length });
+        
+        const imgResponse = await axios.get(imageUrl, { responseType: 'arraybuffer', httpsAgent });
+        const tempFilePath = path.join(tempDir, `sticker_${i}.png`);
+        fs.writeFileSync(tempFilePath, Buffer.from(imgResponse.data));
+        filePaths.push(tempFilePath);
+      } catch (e) {
+        console.error('[Main] Failed to download image:', imageUrl, e);
+      }
+    }
+
+    return { success: true, filePaths, tempDir };
+  } catch (error) {
+    console.error('[Main] Error importing LINE stickers:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Ошибка загрузки' };
+  }
+});
+
 ipcMain.handle(IPC_CHANNELS.PROCESS_SLICING, async (event, params: SlicingParams): Promise<SlicingResult> => {
   try {
-    const { images, targetDir, outputFormat, upscaleMode, downscaleMode, startIndex = 0 } = params;
+    const { images, targetDir, outputFormat, upscaleMode, downscaleMode, preserveAnimation, performanceMode, startIndex = 0, isVideo = preserveAnimation } = params;
     
     fs.mkdirSync(targetDir, { recursive: true });
     
@@ -434,253 +553,78 @@ ipcMain.handle(IPC_CHANNELS.PROCESS_SLICING, async (event, params: SlicingParams
     fs.mkdirSync(tempDir, { recursive: true });
 
     const targetSize = outputFormat === 'STICKER' ? 512 : 100;
-    let totalFragments = 0;
-    const imageData: Array<{ id: string; path: string; rows: number; columns: number; canvas: Buffer; isAnimated: boolean }> = [];
-
     let upscaled = 0;
-    let sliced = 0;
     let converted = 0;
+    
+    console.log(`[Main] Performance mode: ${performanceMode}, processing sequentially`);
 
-    const sendProgress = (stage: 'upscaling' | 'slicing' | 'converting') => {
-      totalFragments = images.reduce((sum, img) => sum + img.rows * img.columns, 0);
+    const totalSteps = await calculateTotalSteps(images, preserveAnimation, tempDir);
+    
+    const sendProgress = (stage: 'processing' | 'uploading', current: number, total: number, message?: string) => {
       const progress: ProgressData = {
-        current: converted,
-        total: totalFragments,
-        percent: Math.round((converted / totalFragments) * 100),
+        current,
+        total,
+        percent: Math.round((current / total) * 100),
         stage,
-        upscaled,
+        upscaled: 0,
         totalImages: images.length,
-        sliced,
-        totalFragments,
-        converted,
+        sliced: 0,
+        totalFragments: 0,
+        converted: 0,
+        message: message || 'Обработка',
       };
       event.sender.send(IPC_CHANNELS.SLICING_PROGRESS, progress);
     };
 
-    // Обработка всех изображений
-    for (const img of images) {
-      let processPath = img.path;
-      const isJpeg = /\.(jpe?g)$/i.test(img.path);
-      
-      if (isJpeg) {
-        const tempPngPath = path.join(tempDir, `${path.basename(img.path, path.extname(img.path))}.png`);
-        await sharp(img.path)
-          .flatten({ background: { r: 0, g: 0, b: 0, alpha: 0 } })
-          .png()
-          .toFile(tempPngPath);
-        processPath = tempPngPath;
-      }
-      
-      const sharpInstance = sharp(processPath, { animated: true });
-      const metadata = await sharpInstance.metadata();
-      const isAnimated = metadata.pages && metadata.pages > 1;
+    const workerPath = path.join(__dirname, 'imageWorker.js');
+    const worker = new Worker(workerPath);
 
-      const W = metadata.width!;
-      let H = metadata.height!;
-      if (isAnimated) H = metadata.pageHeight || H / metadata.pages!;
-
-      const S = Math.max(Math.ceil(W / img.columns), Math.ceil(H / img.rows));
-      const totalW = S * img.columns;
-      const totalH = S * img.rows;
-
-      const extendLeft = Math.floor((totalW - W) / 2);
-      const extendTop = Math.floor((totalH - H) / 2);
-      const extendRight = totalW - W - extendLeft;
-      const extendBottom = totalH - H - extendTop;
-
-      const canvas = await sharp(processPath, isAnimated ? { animated: true } : {})
-        .extend({
-          top: extendTop,
-          bottom: extendBottom,
-          left: extendLeft,
-          right: extendRight,
-          background: { r: 0, g: 0, b: 0, alpha: 0 },
-        })
-        .ensureAlpha()
-        .toBuffer();
-
-      const finalCanvasSize = targetSize * Math.max(img.rows, img.columns);
-      const sourceSize = Math.max(totalW, totalH);
-      const scaleFactor = finalCanvasSize / sourceSize;
-      const needsUpscale = sourceSize < finalCanvasSize;
-      const needsDownscale = sourceSize > finalCanvasSize;
-
-      let processedCanvas: Buffer;
-
-      if (needsDownscale) {
-        // Сценарий А: Уменьшение
-        if (downscaleMode === 'highQuality') {
-          const scaleRatio = sourceSize / finalCanvasSize;
-          
-          if (scaleRatio >= 3) {
-            // Ступенчатое уменьшение для больших коэффициентов
-            const intermediateSize = Math.round(finalCanvasSize * 2);
-            processedCanvas = await sharp(canvas, isAnimated ? { animated: true } : {})
-              .resize(intermediateSize, intermediateSize, { kernel: 'lanczos3', fit: 'inside' })
-              .resize(
-                Math.round(totalW * scaleFactor),
-                Math.round(totalH * scaleFactor),
-                { kernel: 'lanczos3', fit: 'inside' }
-              )
-              .sharpen({ sigma: 0.5 })
-              .ensureAlpha()
-              .toBuffer();
-          } else {
-            processedCanvas = await sharp(canvas, isAnimated ? { animated: true } : {})
-              .resize(
-                Math.round(totalW * scaleFactor),
-                Math.round(totalH * scaleFactor),
-                { kernel: 'lanczos3', fit: 'inside' }
-              )
-              .sharpen({ sigma: 0.5 })
-              .ensureAlpha()
-              .toBuffer();
-          }
-        } else {
-          // Быстрое сжатие
-          processedCanvas = await sharp(canvas, isAnimated ? { animated: true } : {})
-            .resize(
-              Math.round(totalW * scaleFactor),
-              Math.round(totalH * scaleFactor),
-              { kernel: 'lanczos3', fastShrinkOnLoad: true }
-            )
-            .ensureAlpha()
-            .toBuffer();
-        }
-      } else if (needsUpscale) {
-        // Сценарий Б: Увеличение - применяем AI-апскейлер
-        if (upscaleMode === 'sharp') {
-          processedCanvas = await sharp(canvas, isAnimated ? { animated: true } : {})
-            .linear(1.1, -0.05)
-            .resize(
-              Math.round(totalW * scaleFactor * 1.1),
-              Math.round(totalH * scaleFactor * 1.1),
-              { kernel: 'mitchell', fastShrinkOnLoad: false }
-            )
-            .sharpen({ sigma: 1.2, m1: 0.2, m2: 20.0 })
-            .resize(
-              Math.round(totalW * scaleFactor),
-              Math.round(totalH * scaleFactor),
-              { kernel: 'mitchell', fastShrinkOnLoad: false }
-            )
-            .modulate({ saturation: 1.15, brightness: 1.02 })
-            .ensureAlpha()
-            .toBuffer();
-        } else if (upscaleMode === 'soft') {
-          processedCanvas = await sharp(canvas, isAnimated ? { animated: true } : {})
-            .sharpen({ sigma: 1.2, m1: 1.5, m2: 0.7 })
-            .resize(
-              Math.round(totalW * scaleFactor),
-              Math.round(totalH * scaleFactor),
-              { kernel: 'lanczos3', fastShrinkOnLoad: false }
-            )
-            .sharpen({ sigma: 0.8, m1: 1.0, m2: 0.5 })
-            .modulate({ saturation: 1.15, brightness: 1.02 })
-            .ensureAlpha()
-            .toBuffer();
-        } else {
-          processedCanvas = await sharp(canvas, isAnimated ? { animated: true } : {})
-            .resize(
-              Math.round(totalW * scaleFactor),
-              Math.round(totalH * scaleFactor),
-              { kernel: 'lanczos3', fastShrinkOnLoad: false }
-            )
-            .ensureAlpha()
-            .toBuffer();
-        }
-      } else {
-        // Сценарий В: Размеры совпадают
-        processedCanvas = canvas;
-      }
-
-      imageData.push({ id: img.id, path: img.path, rows: img.rows, columns: img.columns, canvas: processedCanvas, isAnimated });
-      upscaled++;
-      sendProgress('upscaling');
-    }
-
-    // Параллельная нарезка и конвертация
-    const maxWorkers = os.cpus().length;
-    const tasks: Array<{ imageId: string; row: number; col: number; canvas: Buffer; isAnimated: boolean; globalIndex: number }> = [];
-
-    let globalFragmentIndex = startIndex;
-    for (const img of imageData) {
-      for (let row = 0; row < img.rows; row++) {
-        for (let col = 0; col < img.columns; col++) {
-          tasks.push({ imageId: img.id, row, col, canvas: img.canvas, isAnimated: img.isAnimated, globalIndex: globalFragmentIndex });
-          globalFragmentIndex++;
-        }
-      }
-    }
-
-    const workerPath = path.join(__dirname, 'tileWorker.js');
-
+    let processedSteps = 0;
     await new Promise<void>((resolve, reject) => {
-      const activeWorkers = new Set<Worker>();
-      let taskIndex = 0;
-      const results: Array<{ globalIndex: number; success: boolean }> = [];
-
-      const checkCompletion = () => {
-        if (taskIndex >= tasks.length && activeWorkers.size === 0) {
-          results.sort((a, b) => a.globalIndex - b.globalIndex);
-          resolve();
-        }
-      };
-
-      const startWorker = () => {
-        if (taskIndex >= tasks.length) {
-          checkCompletion();
-          return;
-        }
-
-        const task = tasks[taskIndex++];
-        const worker = new Worker(workerPath);
-        activeWorkers.add(worker);
-
-        worker.on('message', (result) => {
-          if (result.stage === 'sliced') {
-            sliced++;
-            sendProgress('slicing');
-          } else if (result.success) {
-            converted++;
-            results.push({ globalIndex: task.globalIndex, success: true });
-            sendProgress('converting');
-            worker.terminate();
-            activeWorkers.delete(worker);
-            startWorker();
-          } else {
-            reject(new Error(result.error));
-            worker.terminate();
-            activeWorkers.delete(worker);
-          }
-        });
-
-        worker.on('error', (err) => {
-          reject(err);
+      worker.on('message', (result) => {
+        if (result.stage === 'fragmentComplete') {
+          processedSteps++;
+          sendProgress('processing', processedSteps, totalSteps, 'Обработка');
+        } else if (result.stage === 'skip') {
+          console.warn(`[Main] Skipped image ${result.imageId}: ${result.reason}`);
+        } else if (result.stage === 'allComplete') {
           worker.terminate();
-          activeWorkers.delete(worker);
-        });
+          resolve();
+        } else if (result.stage === 'error') {
+          console.error(`[Main] Worker error:`, result.error);
+          reject(new Error(result.error));
+          worker.terminate();
+        }
+      });
 
-        worker.postMessage({
-          canvasBuffer: task.canvas,
-          isAnimated: task.isAnimated,
-          row: task.row,
-          col: task.col,
-          targetSize,
-          targetDir,
-          tempDir,
-          upscaleMode,
-          imageId: task.imageId,
-          globalIndex: task.globalIndex,
-        });
-      };
+      worker.on('error', (err) => {
+        console.error(`[Main] Worker error:`, err);
+        reject(err);
+        worker.terminate();
+      });
 
-      for (let i = 0; i < Math.min(maxWorkers, tasks.length); i++) {
-        startWorker();
-      }
+      worker.postMessage({
+        images: images.map(img => ({
+          id: img.id,
+          path: img.path,
+          rows: img.rows,
+          columns: img.columns,
+        })),
+        targetSize,
+        targetDir,
+        tempDir,
+        upscaleMode,
+        downscaleMode,
+        preserveAnimation,
+        startIndex,
+        isVideo: isVideo || preserveAnimation,
+        compressionMode: params.compressionMode || 'auto',
+      });
     });
 
     fs.rmSync(tempDir, { recursive: true, force: true });
 
+    const totalFragments = images.reduce((sum, img) => sum + img.rows * img.columns, 0);
     return {
       success: true,
       message: `Создано ${totalFragments} файлов из ${images.length} изображений`,
@@ -844,21 +788,54 @@ ipcMain.handle(IPC_CHANNELS.CREATE_TELEGRAM_PACK, async (event, params: Telegram
     );
 
     if (result.success && result.packLink) {
+      console.log('[Main] Upload successful, syncing with Telegram...');
+      
+      // Получаем полный пак из Telegram
       const stickerSet = await botClient.getStickerSet(fullPackName);
       
       if (stickerSet?.stickers) {
-        if (params.outputFormat === 'EMOJI' && !isUpdate) {
-          manifestService.syncWithTelegram(files, stickerSet.stickers, emoji);
-        } else {
-          const uploadedFileNames = pendingFragments.map(f => f.fileName);
-          const startIndex = Math.max(0, stickerSet.stickers.length - uploadedFileNames.length);
-          const newStickers = stickerSet.stickers.slice(startIndex);
-          
-          uploadedFileNames.forEach((fileName, i) => {
-            if (i < newStickers.length) {
-              manifestService.markUploaded(fileName, newStickers[i].file_id, emoji);
-            }
-          });
+        console.log('[Main] TG pack has', stickerSet.stickers.length, 'stickers');
+        
+        // Создаем Map из TG стикеров по fileId
+        const tgStickersById = new Map(stickerSet.stickers.map((s: any) => [s.file_id, s]));
+        
+        // Получаем текущий manifest
+        const manifest = manifestService.load();
+        
+        // Обновляем все фрагменты: если fileId уже есть - проверяем что он в TG
+        manifest.fragments.forEach((frag: any) => {
+          if (frag.fileId && tgStickersById.has(frag.fileId)) {
+            frag.status = 'uploaded';
+            console.log('[Main] Confirmed', frag.fileName, 'is uploaded with fileId:', frag.fileId);
+          }
+        });
+        
+        // Для pending фрагментов пытаемся найти соответствие
+        // Берем последние N стикеров из TG (где N = количество pending)
+        const pendingFileNames = pendingFragments.map(f => f.fileName);
+        const newStickers = stickerSet.stickers.slice(-pendingFileNames.length);
+        
+        console.log('[Main] Syncing', pendingFileNames.length, 'pending fragments with last', newStickers.length, 'TG stickers');
+        
+        pendingFileNames.forEach((fileName, i) => {
+          if (i < newStickers.length) {
+            const tgSticker = newStickers[i];
+            console.log('[Main] Marking', fileName, 'as uploaded with fileId:', tgSticker.file_id);
+            manifestService.markUploaded(fileName, tgSticker.file_id, tgSticker.emoji);
+          }
+        });
+        
+        // Синхронизируем порядок с TG
+        const tgOrder = stickerSet.stickers.map((s: any) => {
+          const frag = manifest.fragments.find(f => f.fileId === s.file_id);
+          return frag?.fileName;
+        }).filter(Boolean) as string[];
+        
+        if (tgOrder.length > 0) {
+          const updatedManifest = manifestService.load();
+          updatedManifest.order = tgOrder;
+          manifestService.save(updatedManifest);
+          console.log('[Main] Synced order with TG:', tgOrder.length, 'items');
         }
       }
       

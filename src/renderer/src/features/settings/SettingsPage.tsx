@@ -18,7 +18,9 @@ export function SettingsPage() {
   const [presetRows, setPresetRows] = useState(1);
   const [presetCols, setPresetCols] = useState(1);
   const [presetMode, setPresetMode] = useState<'soft' | 'sharp'>('soft');
+  const [presetDownscaleMode, setPresetDownscaleMode] = useState<'none' | 'highQuality'>('none');
   const [presetFormat, setPresetFormat] = useState<'STICKER' | 'EMOJI'>('STICKER');
+  const [presetAnimation, setPresetAnimation] = useState(true);
 
   const handleBack = () => dispatch(navigateTo('HOME'));
 
@@ -43,7 +45,9 @@ export function SettingsPage() {
       rows: presetRows,
       columns: presetCols,
       upscaleMode: presetMode,
+      downscaleMode: presetDownscaleMode,
       outputFormat: presetFormat,
+      preserveAnimation: presetAnimation,
     };
     dispatch(addPreset(preset));
     await window.electron.store.set('presets', [...presets, preset]);
@@ -157,10 +161,20 @@ export function SettingsPage() {
                 <option value="soft">Мягкий</option>
                 <option value="sharp">Четкий</option>
               </select>
+              <label className={styles.label}>Режим уменьшения</label>
+              <select className={styles.select} value={presetDownscaleMode} onChange={(e) => setPresetDownscaleMode(e.target.value as any)}>
+                <option value="none">Без обработки</option>
+                <option value="highQuality">High Quality (Lanczos)</option>
+              </select>
               <label className={styles.label}>Тип пака</label>
               <select className={styles.select} value={presetFormat} onChange={(e) => setPresetFormat(e.target.value as any)}>
                 <option value="STICKER">Стикерпак (512x512)</option>
                 <option value="EMOJI">Эмодзи-пак (100x100)</option>
+              </select>
+              <label className={styles.label}>Анимация</label>
+              <select className={styles.select} value={presetAnimation ? 'yes' : 'no'} onChange={(e) => setPresetAnimation(e.target.value === 'yes')}>
+                <option value="yes">Сохранить (видео)</option>
+                <option value="no">Убрать (webp)</option>
               </select>
               <Button onClick={handleAddPreset}>Добавить</Button>
             </div>
@@ -169,7 +183,7 @@ export function SettingsPage() {
                 <div key={preset.id} className={styles.presetCard}>
                   <div className={styles.presetName}>{preset.name}</div>
                   <div className={styles.presetDetails}>
-                    {preset.rows}x{preset.columns} • {preset.upscaleMode === 'none' ? 'Без апскейлера' : preset.upscaleMode === 'soft' ? 'Мягкий' : 'Четкий'} • {preset.outputFormat === 'STICKER' ? 'Стикер' : 'Эмодзи'}
+                    {preset.rows}x{preset.columns} • {preset.upscaleMode === 'none' ? 'Без апскейлера' : preset.upscaleMode === 'soft' ? 'Мягкий' : 'Четкий'} • {preset.downscaleMode === 'highQuality' ? 'HQ' : 'Стандарт'} • {preset.outputFormat === 'STICKER' ? 'Стикер' : 'Эмодзи'} • {preset.preserveAnimation ? 'Аним.' : 'Статика'}
                   </div>
                   <IconButton 
                     variant="danger"

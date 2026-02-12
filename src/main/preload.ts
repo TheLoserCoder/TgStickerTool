@@ -41,6 +41,11 @@ contextBridge.exposeInMainWorld('electron', {
     ipcRenderer.invoke(IPC_CHANNELS.UPDATE_MANIFEST, packDir),
   reorderStickers: (packDir: string, botToken: string, order: string[]) =>
     ipcRenderer.invoke(IPC_CHANNELS.REORDER_STICKERS, packDir, botToken, order),
+  importLineStickers: (url: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.IMPORT_LINE_STICKERS, url),
+  onLineImportProgress: (callback: (data: { current: number; total: number }) => void) => {
+    ipcRenderer.on('line-import-progress', (_, data) => callback(data));
+  },
   store: {
     get: (key: string) => ipcRenderer.invoke(IPC_CHANNELS.STORE_GET, key),
     set: (key: string, value: any) => ipcRenderer.invoke(IPC_CHANNELS.STORE_SET, key, value),

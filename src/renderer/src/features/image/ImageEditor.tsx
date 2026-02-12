@@ -1,6 +1,6 @@
 import { useAppDispatch, useAppSelector } from '../../app/hooks';
 import { navigateTo } from '../../app/appSlice';
-import { addImages, removeImage, setActiveImage, updateImageSettings, updateGlobalSettings, increaseZoom, decreaseZoom, resetZoom, setOutputFormat, setUpscaleMode, setDownscaleMode, setProcessing, setProgress, resetImage } from './imageSlice';
+import { addImages, removeImage, setActiveImage, updateImageSettings, updateGlobalSettings, increaseZoom, decreaseZoom, resetZoom, setOutputFormat, setUpscaleMode, setDownscaleMode, setPreserveAnimation, setPerformanceMode, setCompressionMode, setProcessing, setProgress, resetImage } from './imageSlice';
 import { ImageIcon, DownloadIcon, UploadIcon } from '@radix-ui/react-icons';
 import { Button, IconButton } from '../../shared/components/ui';
 import { ImageCanvas } from './ImageCanvas';
@@ -17,7 +17,7 @@ const generatePackId = () => `pack_${Date.now()}_${Math.random().toString(36).su
 
 export function ImageEditor() {
   const dispatch = useAppDispatch();
-  const { images, activeImageId, zoom, outputFormat, upscaleMode, downscaleMode, globalSettings, isProcessing, progress } = useAppSelector((state) => state.image);
+  const { images, activeImageId, zoom, outputFormat, upscaleMode, downscaleMode, preserveAnimation, performanceMode, compressionMode, globalSettings, isProcessing, progress } = useAppSelector((state) => state.image);
   const { presets } = useAppSelector((state) => state.app);
   const [telegramDialogOpen, setTelegramDialogOpen] = useState(false);
   const [localDialogOpen, setLocalDialogOpen] = useState(false);
@@ -96,6 +96,7 @@ export function ImageEditor() {
     dispatch(setUpscaleMode(preset.upscaleMode));
     dispatch(setDownscaleMode(preset.downscaleMode));
     dispatch(setOutputFormat(preset.outputFormat));
+    dispatch(setPreserveAnimation(preset.preserveAnimation));
   };
 
   const activeImage = images.find(img => img.id === activeImageId);
@@ -143,6 +144,10 @@ export function ImageEditor() {
       outputFormat,
       upscaleMode,
       downscaleMode,
+      preserveAnimation,
+      performanceMode,
+      compressionMode,
+      isVideo: preserveAnimation && (images[0].path.toLowerCase().endsWith('.gif') || images[0].path.toLowerCase().endsWith('.apng') || images[0].path.toLowerCase().endsWith('.webp')),
     });
 
     if (!slicingResult.success) {
@@ -168,7 +173,7 @@ export function ImageEditor() {
         downscaleMode,
       },
       status: 'local' as const,
-      isAnimated: images[0].path.toLowerCase().endsWith('.gif') || images[0].path.toLowerCase().endsWith('.apng'),
+      isAnimated: preserveAnimation && (images[0].path.toLowerCase().endsWith('.gif') || images[0].path.toLowerCase().endsWith('.apng') || images[0].path.toLowerCase().endsWith('.webp')),
     };
 
     await window.electron.savePack(packId, packDir, images[0].path, localPack);
@@ -189,7 +194,7 @@ export function ImageEditor() {
     window.electron.onTelegramUploadProgress((uploadData) => {
       const totalSteps = slicingResult.filesCreated || 0;
       const uploadPercent = Math.round((uploadData.current / totalSteps) * 100);
-      dispatch(setProgress({ ...progress, percent: uploadPercent, stage: 'converting' }));
+      dispatch(setProgress({ percent: uploadPercent, stage: 'uploading', upscaled: 0, totalImages: 0, sliced: 0, totalFragments: 0, converted: 0 }));
     });
 
     const telegramResult = await window.electron.createTelegramPack({
@@ -237,6 +242,10 @@ export function ImageEditor() {
       outputFormat,
       upscaleMode,
       downscaleMode,
+      preserveAnimation,
+      performanceMode,
+      compressionMode,
+      isVideo: preserveAnimation && (images[0].path.toLowerCase().endsWith('.gif') || images[0].path.toLowerCase().endsWith('.apng') || images[0].path.toLowerCase().endsWith('.webp')),
     });
 
     dispatch(setProcessing(false));
@@ -259,7 +268,7 @@ export function ImageEditor() {
           downscaleMode,
         },
         status: 'local' as const,
-        isAnimated: images[0].path.toLowerCase().endsWith('.gif') || images[0].path.toLowerCase().endsWith('.apng'),
+        isAnimated: preserveAnimation && (images[0].path.toLowerCase().endsWith('.gif') || images[0].path.toLowerCase().endsWith('.apng') || images[0].path.toLowerCase().endsWith('.webp')),
       };
 
       await window.electron.savePack(packId, packDir, images[0].path, localPack);
@@ -294,7 +303,11 @@ export function ImageEditor() {
       outputFormat,
       upscaleMode,
       downscaleMode,
+      preserveAnimation,
+      performanceMode,
+      compressionMode,
       startIndex: editingPack.nextFragmentIndex || 0,
+      isVideo: preserveAnimation && (images[0].path.toLowerCase().endsWith('.gif') || images[0].path.toLowerCase().endsWith('.apng') || images[0].path.toLowerCase().endsWith('.webp')),
     });
 
     dispatch(setProcessing(false));
@@ -365,6 +378,33 @@ export function ImageEditor() {
         </div>
 
         <div className={styles.sidebar__section}>
+          <label className={styles.sidebar__label}>Анимация</label>
+          <select className={styles.select} value={preserveAnimation ? 'yes' : 'no'} onChange={(e) => dispatch(setPreserveAnimation(e.target.value === 'yes'))}>
+            <option value="yes">Сохранить (видео)</option>
+            <option value="no">Убрать (webp)</option>
+          </select>
+        </div>
+
+        {preserveAnimation && (
+          <div className={styles.sidebar__section}>
+            <label className={styles.sidebar__label}>Сжатие длительности</label>
+            <select className={styles.select} value={compressionMode} onChange={(e) => dispatch(setCompressionMode(e.target.value as 'none' | 'auto'))}>
+              <option value="auto">Сжимать (авто)</option>
+              <option value="none">Нет (ошибка если &gt;лимита)</option>
+            </select>
+          </div>
+        )}
+
+        <div className={styles.sidebar__section}>
+          <label className={styles.sidebar__label}>Производительность</label>
+          <select className={styles.select} value={performanceMode} onChange={(e) => dispatch(setPerformanceMode(e.target.value as any))}>
+            <option value="minimal">Минимальная</option>
+            <option value="balanced">Базовая</option>
+            <option value="maximum">Максимальная</option>
+          </select>
+        </div>
+
+        <div className={styles.sidebar__section}>
           <label className={styles.sidebar__label}>Строки</label>
           <div className={styles.input}>
             <button className={styles.input__button} onClick={() => handleRowsChange(currentSettings.rows - 1)}>-</button>
@@ -399,7 +439,10 @@ export function ImageEditor() {
 
         {isProcessing && (
           <div className={styles.progressInfo}>
-            <div>Обработка: {progress.percent}%</div>
+            <div>
+              {progress.stage === 'processing' && `Обработка: ${progress.percent}%`}
+              {progress.stage === 'uploading' && `Загрузка в ТГ: ${progress.percent}%`}
+            </div>
           </div>
         )}
 
@@ -434,7 +477,17 @@ export function ImageEditor() {
               </div>
               {images.map(img => (
                 <div key={img.id} className={`${styles.galleryItem} ${activeImageId === img.id ? styles.active : ''}`}>
-                  <button className={styles.galleryRemove} onClick={(e) => { e.stopPropagation(); dispatch(removeImage(img.id)); }}>×</button>
+                  <button className={styles.galleryRemove} onClick={async (e) => { 
+                    e.stopPropagation(); 
+                    if (editingPack && images.length === 1) {
+                      const userDataPath = await window.electron.store.get('userDataPath') || '';
+                      const packDir = `${userDataPath}/library/${editingPack.id}`;
+                      await window.electron.deletePack(editingPack.id, packDir);
+                      const localPacks = await window.electron.store.get('localPacks') || [];
+                      await window.electron.store.set('localPacks', localPacks.filter((p: LocalPack) => p.id !== editingPack.id));
+                    }
+                    dispatch(removeImage(img.id)); 
+                  }}>×</button>
                   <img src={img.data} alt="" className={styles.galleryThumb} onClick={() => dispatch(setActiveImage(img.id))} />
                 </div>
               ))}

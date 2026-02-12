@@ -321,6 +321,12 @@
   border-radius: $radius-md;
 }
 
+.progressDetails {
+  font-size: 0.75rem;
+  color: $text-tertiary;
+  margin-top: 2px;
+}
+
 .buttonGroup {
   display: flex;
   gap: $spacing-sm;

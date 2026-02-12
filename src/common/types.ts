@@ -18,6 +18,8 @@ export interface ElectronAPI {
   updateFragmentOrder: (packDir: string, order: string[]) => Promise<void>;
   updateManifest: (packDir: string) => Promise<void>;
   reorderStickers: (packDir: string, botToken: string, order: string[]) => Promise<{ success: boolean; moved?: number; error?: string }>;
+  importLineStickers: (url: string) => Promise<{ success: boolean; filePaths?: string[]; tempDir?: string; error?: string }>;
+  onLineImportProgress: (callback: (data: { current: number; total: number }) => void) => void;
   store: {
     get: (key: string) => Promise<any>;
     set: (key: string, value: any) => Promise<void>;
@@ -39,6 +41,7 @@ export interface Preset {
   upscaleMode: UpscaleMode;
   downscaleMode: DownscaleMode;
   outputFormat: OutputFormat;
+  preserveAnimation: boolean;
 }
 
 export interface LocalPack {
@@ -99,7 +102,11 @@ export interface SlicingParams {
   outputFormat: OutputFormat;
   upscaleMode: UpscaleMode;
   downscaleMode: DownscaleMode;
+  preserveAnimation: boolean;
+  performanceMode: 'minimal' | 'balanced' | 'maximum';
   startIndex?: number;
+  isVideo?: boolean;
+  compressionMode?: 'none' | 'auto';
 }
 
 export interface SlicingResult {
@@ -119,6 +126,7 @@ export interface ProgressData {
   sliced: number;
   totalFragments: number;
   converted: number;
+  message?: string;
 }
 
 export interface TelegramPackParams {
@@ -178,4 +186,5 @@ export const IPC_CHANNELS = {
   UPDATE_FRAGMENT_ORDER: 'pack:updateFragmentOrder',
   UPDATE_MANIFEST: 'pack:updateManifest',
   REORDER_STICKERS: 'pack:reorderStickers',
+  IMPORT_LINE_STICKERS: 'line:importStickers',
 } as const;

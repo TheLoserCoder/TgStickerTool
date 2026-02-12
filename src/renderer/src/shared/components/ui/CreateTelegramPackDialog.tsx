@@ -39,11 +39,9 @@ export function CreateTelegramPackDialog({ open, onOpenChange, onSubmit, default
 
   useEffect(() => {
     if (!isSlugManual && name) {
-      const bot = bots.find(b => b.id === botId);
-      const botName = bot?.name.toLowerCase().replace(/\s+/g, '_') || 'bot';
       const hash = Math.random().toString(36).substring(2, 8);
       const translitName = transliterate(name).replace(/[^a-z0-9]/g, '_');
-      setSlug(`${translitName}_${hash}_${botName}`);
+      setSlug(`${translitName}_${hash}`);
     }
   }, [name, botId, isSlugManual, bots]);
 

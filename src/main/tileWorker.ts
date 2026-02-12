@@ -17,17 +17,23 @@ interface WorkerTask {
   upscaleMode: 'soft' | 'sharp';
   imageId: string;
   globalIndex: number;
+  hardwareEncoder: string | null;
 }
 
 parentPort?.on('message', async (task: WorkerTask) => {
   try {
-    const { canvasBuffer, isAnimated, row, col, targetSize, targetDir, tempDir, globalIndex } = task;
+    const { canvasBuffer, isAnimated, row, col, targetSize, targetDir, tempDir, globalIndex, hardwareEncoder } = task;
+    
+    const metadata = await sharp(canvasBuffer, isAnimated ? { animated: true } : {}).metadata();
+    const isActuallyAnimated = isAnimated && metadata.pages !== undefined && metadata.pages > 1;
+    
+    console.log(`[Worker] Fragment ${globalIndex}: isAnimated=${isAnimated}, format=${metadata.format}, pages=${metadata.pages}, isActuallyAnimated=${isActuallyAnimated}, hardwareEncoder=${hardwareEncoder}`);
+    
     const columns = Math.floor(Math.sqrt(canvasBuffer.length / (targetSize * targetSize * 4)));
     const fragmentId = `frag_${String(globalIndex).padStart(5, '0')}_r${row}_c${col}`;
 
-    if (isAnimated) {
-      const tempGifPath = path.join(tempDir, `${fragmentId}.gif`);
-      const outputWebmPath = path.join(targetDir, `${fragmentId}.webm`);
+    if (isActuallyAnimated) {
+      const outputWebpPath = path.join(targetDir, `${fragmentId}.webp`);
 
       await sharp(canvasBuffer, { animated: true })
         .extract({
@@ -36,33 +42,10 @@ parentPort?.on('message', async (task: WorkerTask) => {
           width: targetSize,
           height: targetSize,
         })
-        .gif({ quality: 100, effort: 10 })
-        .toFile(tempGifPath);
+        .webp({ quality: 100, effort: 6, loop: 0 })
+        .toFile(outputWebpPath);
 
       parentPort?.postMessage({ stage: 'sliced', row, col });
-
-      const videoSize = targetSize === 100 ? 100 : 512;
-      
-      await new Promise<void>((resolve, reject) => {
-        ffmpeg(tempGifPath)
-          .outputOptions([
-            '-c:v libvpx-vp9',
-            '-pix_fmt yuva420p',
-            `-s ${videoSize}x${videoSize}`,
-            '-b:v 0',
-            '-crf 15',
-            '-quality best',
-            '-auto-alt-ref 0',
-            '-an',
-            '-threads 1',
-          ])
-          .output(outputWebmPath)
-          .on('end', () => resolve())
-          .on('error', (err) => reject(err))
-          .run();
-      });
-
-      fs.unlinkSync(tempGifPath);
     } else {
       const outputWebpPath = path.join(targetDir, `${fragmentId}.webp`);
 
@@ -82,6 +65,7 @@ parentPort?.on('message', async (task: WorkerTask) => {
 
     parentPort?.postMessage({ success: true, row, col });
   } catch (error) {
+    console.error(`[Worker] Error processing fragment:`, error);
     parentPort?.postMessage({
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',

@@ -6,7 +6,7 @@ exports.default = async function(context) {
   const platform = context.electronPlatformName;
   
   // Копируем только нативные модули, остальное уже в ASAR
-  const modulesToCopy = ['sharp', '@img', '@ffmpeg-installer'];
+  const modulesToCopy = ['sharp', '@img', '@ffmpeg-installer', '@ffprobe-installer'];
   
   if (platform === 'linux' || platform === 'win32') {
     const resourcesDir = path.join(appOutDir, 'resources');

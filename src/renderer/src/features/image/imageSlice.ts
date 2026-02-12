@@ -15,6 +15,9 @@ interface ImageState {
   outputFormat: OutputFormat;
   upscaleMode: UpscaleMode;
   downscaleMode: DownscaleMode;
+  preserveAnimation: boolean;
+  performanceMode: 'minimal' | 'balanced' | 'maximum';
+  compressionMode: 'none' | 'auto';
   globalSettings: ImageSettings;
   isProcessing: boolean;
   progress: {
@@ -33,7 +36,10 @@ const initialState: ImageState = {
   zoom: 1,
   outputFormat: 'STICKER',
   upscaleMode: 'soft',
-  downscaleMode: 'highQuality',
+  downscaleMode: 'none',
+  preserveAnimation: true,
+  performanceMode: 'balanced',
+  compressionMode: 'auto',
   globalSettings: { rows: 1, columns: 1 },
   isProcessing: false,
   progress: {
@@ -101,6 +107,15 @@ const imageSlice = createSlice({
     setDownscaleMode: (state, action: PayloadAction<DownscaleMode>) => {
       state.downscaleMode = action.payload;
     },
+    setPreserveAnimation: (state, action: PayloadAction<boolean>) => {
+      state.preserveAnimation = action.payload;
+    },
+    setPerformanceMode: (state, action: PayloadAction<'minimal' | 'balanced' | 'maximum'>) => {
+      state.performanceMode = action.payload;
+    },
+    setCompressionMode: (state, action: PayloadAction<'none' | 'auto'>) => {
+      state.compressionMode = action.payload;
+    },
     setProcessing: (state, action: PayloadAction<boolean>) => {
       state.isProcessing = action.payload;
     },
@@ -124,6 +139,9 @@ export const {
   setOutputFormat,
   setUpscaleMode,
   setDownscaleMode,
+  setPreserveAnimation,
+  setPerformanceMode,
+  setCompressionMode,
   setProcessing,
   setProgress,
   resetImage,
